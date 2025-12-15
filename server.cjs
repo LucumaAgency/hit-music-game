@@ -11,6 +11,11 @@ const PORT = process.env.PORT || 3000
 app.use(cors())
 app.use(express.json())
 
+// Servir index.html del dist PRIMERO para la raíz
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'))
+})
+
 // Servir archivos estáticos del build con MIME types correctos
 app.use(express.static(path.join(__dirname, 'dist'), {
   setHeaders: (res, filePath) => {

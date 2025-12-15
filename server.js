@@ -24,6 +24,16 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 // Carpeta para uploads (fuera de dist para no ser sobrescrita por deploys)
 const UPLOADS_DIR = path.join(__dirname, 'uploads', 'songs')
 
+// Endpoint de prueba
+app.get('/api/test', (req, res) => {
+  res.json({
+    ok: true,
+    message: 'Node.js funcionando',
+    dirname: __dirname,
+    uploadsDir: UPLOADS_DIR
+  })
+})
+
 // Configurar multer para subir archivos
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {

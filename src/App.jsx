@@ -119,77 +119,61 @@ function analyzeAudio(audioBuffer) {
   const channelData = audioBuffer.getChannelData(0)
   const notes = []
 
-  // Configuración de bandas de frecuencia para cada carril (umbrales más altos)
-  const bands = [
-    { lane: 0, lowFreq: 20, highFreq: 150, name: 'bass', threshold: 0.25 },      // Bombo/Bajo
-    { lane: 1, lowFreq: 150, highFreq: 400, name: 'snare', threshold: 0.20 },    // Caja
-    { lane: 2, lowFreq: 400, highFreq: 1200, name: 'guitar', threshold: 0.18 },  // Guitarra
-    { lane: 3, lowFreq: 1200, highFreq: 4000, name: 'vocals', threshold: 0.15 }, // Voz
-    { lane: 4, lowFreq: 4000, highFreq: 10000, name: 'hihat', threshold: 0.12 }  // Hi-hats
+  // Bandas priorizadas: Guitarra > Batería (bombo+caja) > Voz
+  const priorityBands = [
+    { name: 'guitar', lowFreq: 400, highFreq: 1200, threshold: 0.12, priority: 1 },   // Guitarra - máxima prioridad
+    { name: 'bass', lowFreq: 20, highFreq: 150, threshold: 0.15, priority: 2 },       // Bombo
+    { name: 'snare', lowFreq: 150, highFreq: 400, threshold: 0.12, priority: 2 },     // Caja
+    { name: 'vocals', lowFreq: 1200, highFreq: 4000, threshold: 0.10, priority: 3 },  // Voz
   ]
 
-  const windowSize = Math.floor(sampleRate * 0.05) // 50ms ventanas
-
-  // Track de última nota por carril para evitar spam
-  const lastNoteTime = [-1, -1, -1, -1, -1]
-  const minTimeBetweenNotesPerLane = 0.3 // 300ms mínimo entre notas del mismo carril
+  const windowSize = Math.floor(sampleRate * 0.04) // 40ms ventanas para más detalle
 
   // Pre-filtrar el audio para cada banda
-  const filteredBands = bands.map(band => ({
+  const filteredBands = priorityBands.map(band => ({
     ...band,
     data: bandpassFilter(channelData, sampleRate, band.lowFreq, band.highFreq)
   }))
+
+  let noteIndex = 0
 
   // Analizar cada ventana de tiempo
   for (let i = 0; i < channelData.length; i += windowSize) {
     const time = i / sampleRate
     const windowEnd = Math.min(i + windowSize, channelData.length)
 
-    // Encontrar la banda con mayor energía en esta ventana
-    let maxEnergy = 0
-    let bestBand = null
+    // Verificar cada banda por prioridad
+    let detected = false
 
-    filteredBands.forEach(band => {
+    // Ordenar por prioridad
+    const sortedBands = [...filteredBands].sort((a, b) => a.priority - b.priority)
+
+    for (const band of sortedBands) {
+      if (detected) break
+
       let energy = 0
       for (let j = i; j < windowEnd; j++) {
         energy += band.data[j] * band.data[j]
       }
       energy = Math.sqrt(energy / (windowEnd - i))
 
-      // Solo considerar si supera el umbral y es la más fuerte
-      if (energy > band.threshold && energy > maxEnergy && time - lastNoteTime[band.lane] >= minTimeBetweenNotesPerLane) {
-        maxEnergy = energy
-        bestBand = band
+      // Si esta banda tiene suficiente energía, generar nota
+      if (energy > band.threshold) {
+        // Asignar carril aleatorio (con semilla para consistencia)
+        const lane = Math.floor(seededRandom(time * 1000 + noteIndex) * 5)
+
+        notes.push({
+          time: Math.round(time * 1000) / 1000,
+          lane: lane,
+          instrument: band.name
+        })
+        noteIndex++
+        detected = true
       }
-    })
-
-    // Agregar solo la nota más prominente de esta ventana
-    if (bestBand) {
-      notes.push({
-        time: Math.round(time * 1000) / 1000,
-        lane: bestBand.lane,
-        instrument: bestBand.name
-      })
-      lastNoteTime[bestBand.lane] = time
     }
   }
 
-  // Ordenar por tiempo
-  const sortedNotes = notes.sort((a, b) => a.time - b.time)
-
-  // Filtrar notas demasiado cercanas globalmente (máx 1 nota cada 150ms)
-  const filteredNotes = []
-  let lastGlobalTime = -1
-  const minGlobalTime = 0.15
-
-  for (const note of sortedNotes) {
-    if (note.time - lastGlobalTime >= minGlobalTime) {
-      filteredNotes.push(note)
-      lastGlobalTime = note.time
-    }
-  }
-
-  return filteredNotes
+  return notes
 }
 
 function downloadJSON(data, filename) {

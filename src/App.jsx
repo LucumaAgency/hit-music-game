@@ -171,16 +171,20 @@ function App() {
           body: formData
         })
         if (response.ok) {
-          console.log('Canción guardada en el servidor')
-          // Recargar lista de canciones
-          const songsRes = await fetch('/songs/index.json')
+          const result = await response.json()
+          console.log('Canción guardada en el servidor:', result)
+          // Recargar lista de canciones desde API
+          const songsRes = await fetch('/api/songs')
           if (songsRes.ok) {
             const data = await songsRes.json()
             setSongs(data.songs || [])
           }
+        } else {
+          console.error('Error del servidor:', response.status)
         }
       } catch (uploadError) {
-        console.log('No se pudo guardar en servidor, modo offline')
+        console.error('Error subiendo al servidor:', uploadError)
+        alert('No se pudo guardar en el servidor. Descargando JSON como respaldo.')
         // Descargar JSON como fallback
         downloadJSON(songData, `${fileName}.json`)
       }

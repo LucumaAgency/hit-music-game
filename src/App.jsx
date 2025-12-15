@@ -201,6 +201,7 @@ function App() {
   const [countdown, setCountdown] = useState(null)
   const [opponentFinished, setOpponentFinished] = useState(null)
   const [multiplayerError, setMultiplayerError] = useState('')
+  const [pendingSongLoad, setPendingSongLoad] = useState(null)
   const socketRef = useRef(null)
 
   const audioRef = useRef(null)
@@ -256,6 +257,7 @@ function App() {
 
     newSocket.on('songSelected', (song) => {
       setSelectedSong(song)
+      setPendingSongLoad(song)
     })
 
     newSocket.on('readyUpdate', ({ hostReady, guestReady }) => {
@@ -282,6 +284,14 @@ function App() {
 
     return newSocket
   }, [])
+
+  // Guest auto-load song when host selects it
+  useEffect(() => {
+    if (pendingSongLoad && isMultiplayer && !isHost) {
+      loadSong(pendingSongLoad)
+      setPendingSongLoad(null)
+    }
+  }, [pendingSongLoad, isMultiplayer, isHost])
 
   // Countdown timer
   useEffect(() => {
@@ -807,7 +817,7 @@ function App() {
         </div>
       )}
 
-      {gameState === 'lobby' && isMultiplayer && (
+      {(['lobby', 'analyzing', 'ready'].includes(gameState)) && isMultiplayer && (
         <div className="menu lobby">
           <h2>Sala: {roomCode}</h2>
           <div className="players-list">
@@ -831,7 +841,7 @@ function App() {
             )}
           </div>
 
-          {isHost && opponent && (
+          {isHost && opponent && gameState !== 'analyzing' && (
             <>
               <h3>Selecciona Canción:</h3>
               <div className="song-list">
@@ -849,8 +859,15 @@ function App() {
             </>
           )}
 
-          {!isHost && selectedSong && (
+          {selectedSong && (
             <p className="song-info">Canción: {selectedSong.title} - {selectedSong.artist}</p>
+          )}
+
+          {gameState === 'analyzing' && (
+            <>
+              <p>Cargando canción...</p>
+              <div className="loader"></div>
+            </>
           )}
 
           {selectedSong && gameState === 'ready' && (
@@ -867,14 +884,14 @@ function App() {
         </div>
       )}
 
-      {gameState === 'analyzing' && (
+      {gameState === 'analyzing' && !isMultiplayer && (
         <div className="menu">
           <h2>Analizando audio...</h2>
           <div className="loader"></div>
         </div>
       )}
 
-      {gameState === 'ready' && (
+      {gameState === 'ready' && !isMultiplayer && (
         <div className="menu">
           <h2>Listo!</h2>
           <p className="song-info">{selectedSong?.title} - {selectedSong?.artist}</p>

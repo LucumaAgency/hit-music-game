@@ -190,6 +190,36 @@ body {
   box-shadow: 0 0 20px rgba(100, 100, 100, 0.5) !important;
 }
 
+.upload-divider {
+  display: flex;
+  align-items: center;
+  margin: 20px 0;
+  color: #666;
+}
+
+.upload-divider::before,
+.upload-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #444;
+}
+
+.upload-divider span {
+  padding: 0 15px;
+  font-size: 0.9rem;
+}
+
+.upload-button {
+  background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+  width: 100%;
+  margin-top: 0 !important;
+}
+
+.upload-button:hover {
+  box-shadow: 0 0 30px rgba(59, 130, 246, 0.5) !important;
+}
+
 .json-hint {
   font-size: 0.9rem;
   color: #eab308;

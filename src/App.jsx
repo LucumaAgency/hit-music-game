@@ -84,6 +84,8 @@ function App() {
   const [gameState, setGameState] = useState('idle')
   const [songs, setSongs] = useState([])
   const [selectedSong, setSelectedSong] = useState(null)
+  const [customAudioUrl, setCustomAudioUrl] = useState(null)
+  const fileInputRef = useRef(null)
   const [notes, setNotes] = useState([])
   const [activeNotes, setActiveNotes] = useState([])
   const [score, setScore] = useState(0)
@@ -109,6 +111,56 @@ function App() {
       .then(data => setSongs(data.songs || []))
       .catch(() => console.log('No se encontró index.json'))
   }, [])
+
+  // Manejar subida de MP3
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    // Crear URL temporal para el archivo
+    const audioUrl = URL.createObjectURL(file)
+    setCustomAudioUrl(audioUrl)
+
+    const fileName = file.name.replace('.mp3', '')
+    setSelectedSong({
+      id: 'custom',
+      title: fileName,
+      artist: 'Archivo Local',
+      audio: audioUrl,
+      notes: null
+    })
+
+    setGameState('analyzing')
+
+    // Actualizar src del audio
+    if (audioRef.current) {
+      audioRef.current.src = audioUrl
+    }
+
+    // Analizar el audio
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)()
+      const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer)
+
+      const generatedNotes = analyzeAudio(audioBuffer)
+      setNotes(generatedNotes)
+      notesRef.current = generatedNotes.map((n, i) => ({ ...n, id: i, hit: false, missed: false }))
+
+      // Descargar JSON
+      const songData = {
+        song: { title: fileName, artist: 'Custom', audioFile: file.name },
+        notes: generatedNotes
+      }
+      downloadJSON(songData, `${fileName}.json`)
+
+      setLoadedFromJson(false)
+      setGameState('ready')
+    } catch (error) {
+      console.error('Error analizando audio:', error)
+      setGameState('idle')
+    }
+  }
 
   // Cargar canción seleccionada
   const loadSong = async (song) => {
@@ -211,6 +263,11 @@ function App() {
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current.currentTime = 0
+    }
+    // Limpiar URL temporal si existe
+    if (customAudioUrl) {
+      URL.revokeObjectURL(customAudioUrl)
+      setCustomAudioUrl(null)
     }
     setSelectedSong(null)
     setGameState('idle')
@@ -353,21 +410,36 @@ function App() {
         <div className="menu">
           <h2>Selecciona una Cancion</h2>
           <div className="song-list">
-            {songs.length === 0 ? (
-              <p>No hay canciones disponibles</p>
-            ) : (
-              songs.map(song => (
-                <button
-                  key={song.id}
-                  className="song-button"
-                  onClick={() => loadSong(song)}
-                >
-                  <span className="song-title">{song.title}</span>
-                  <span className="song-artist">{song.artist}</span>
-                </button>
-              ))
-            )}
+            {songs.map(song => (
+              <button
+                key={song.id}
+                className="song-button"
+                onClick={() => loadSong(song)}
+              >
+                <span className="song-title">{song.title}</span>
+                <span className="song-artist">{song.artist}</span>
+              </button>
+            ))}
           </div>
+
+          <div className="upload-divider">
+            <span>o sube tu propio MP3</span>
+          </div>
+
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept=".mp3,audio/mpeg"
+            onChange={handleFileUpload}
+            style={{ display: 'none' }}
+          />
+          <button
+            className="upload-button"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Subir MP3
+          </button>
+
           <p className="instructions">Teclas: A S J K L</p>
         </div>
       )}

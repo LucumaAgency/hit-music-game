@@ -48,6 +48,49 @@ body {
   border: 1px solid #333;
 }
 
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #aaa;
+  font-size: 0.9rem;
+}
+
+.volume-control input[type="range"] {
+  width: 80px;
+  height: 5px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #333;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.volume-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  background: #22c55e;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.pause-hint {
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.pause-menu h2 {
+  color: #eab308;
+}
+
 .menu {
   position: absolute;
   top: 50%;

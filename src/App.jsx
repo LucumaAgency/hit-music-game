@@ -9,13 +9,75 @@ const LANES = [
   { key: 'l', color: '#f97316' },
 ]
 
-const NOTE_SPEED = 3
+const BASE_NOTE_SPEED = 3
 const HIT_WINDOW = 0.15
 const MIN_TIME_BETWEEN_NOTES = 0.25
+const BASE_BPM = 120 // BPM de referencia para velocidad normal
 
 function seededRandom(seed) {
   const x = Math.sin(seed * 9999) * 10000
   return x - Math.floor(x)
+}
+
+function detectBPM(audioBuffer) {
+  const channelData = audioBuffer.getChannelData(0)
+  const sampleRate = audioBuffer.sampleRate
+
+  // Detectar picos de energía
+  const windowSize = Math.floor(sampleRate * 0.05)
+  const peaks = []
+
+  for (let i = 0; i < channelData.length; i += windowSize) {
+    const windowEnd = Math.min(i + windowSize, channelData.length)
+    let sum = 0
+    let max = 0
+
+    for (let j = i; j < windowEnd; j++) {
+      const val = Math.abs(channelData[j])
+      sum += val * val
+      if (val > max) max = val
+    }
+
+    const energy = Math.sqrt(sum / (windowEnd - i))
+    const time = i / sampleRate
+
+    if (energy > 0.3 && max > 0.4) {
+      peaks.push(time)
+    }
+  }
+
+  // Calcular intervalos entre picos
+  const intervals = []
+  for (let i = 1; i < peaks.length; i++) {
+    const interval = peaks[i] - peaks[i - 1]
+    if (interval > 0.2 && interval < 2) { // Entre 30 y 300 BPM
+      intervals.push(interval)
+    }
+  }
+
+  if (intervals.length === 0) return 120 // Default BPM
+
+  // Encontrar el intervalo más común (agrupando en buckets)
+  const buckets = {}
+  intervals.forEach(interval => {
+    const bucket = Math.round(interval * 10) / 10 // Redondear a 0.1s
+    buckets[bucket] = (buckets[bucket] || 0) + 1
+  })
+
+  let mostCommonInterval = 0.5 // Default 120 BPM
+  let maxCount = 0
+  Object.entries(buckets).forEach(([interval, count]) => {
+    if (count > maxCount) {
+      maxCount = count
+      mostCommonInterval = parseFloat(interval)
+    }
+  })
+
+  // Convertir intervalo a BPM
+  const bpm = Math.round(60 / mostCommonInterval)
+
+  // Limitar a un rango razonable
+  return Math.max(60, Math.min(200, bpm))
 }
 
 function analyzeAudio(audioBuffer) {
@@ -98,6 +160,8 @@ function App() {
   const [isPaused, setIsPaused] = useState(false)
   const [volume, setVolume] = useState(0.5)
   const [loadedFromJson, setLoadedFromJson] = useState(false)
+  const [bpm, setBpm] = useState(120)
+  const [noteSpeed, setNoteSpeed] = useState(BASE_NOTE_SPEED)
 
   const audioRef = useRef(null)
   const audioContextRef = useRef(null)
@@ -150,13 +214,21 @@ function App() {
       const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer)
 
       const generatedNotes = analyzeAudio(audioBuffer)
+      const detectedBpm = detectBPM(audioBuffer)
+      setBpm(detectedBpm)
+
+      // Calcular velocidad basada en BPM (más BPM = notas más rápidas)
+      const speed = BASE_NOTE_SPEED * (detectedBpm / BASE_BPM)
+      setNoteSpeed(Math.max(2, Math.min(5, speed))) // Limitar entre 2 y 5
+
       setNotes(generatedNotes)
       notesRef.current = generatedNotes.map((n, i) => ({ ...n, id: i, hit: false, missed: false }))
 
       // Guardar en el servidor
       const songData = {
-        song: { title: fileName, artist: 'Custom', audioFile: file.name },
-        notes: generatedNotes
+        song: { title: fileName, artist: 'Custom', audioFile: file.name, bpm: detectedBpm },
+        notes: generatedNotes,
+        bpm: detectedBpm
       }
 
       const formData = new FormData()
@@ -217,6 +289,12 @@ function App() {
       if (jsonResponse.ok) {
         const songData = await jsonResponse.json()
         const loadedNotes = songData.notes || songData
+        const loadedBpm = songData.bpm || 120
+
+        setBpm(loadedBpm)
+        const speed = BASE_NOTE_SPEED * (loadedBpm / BASE_BPM)
+        setNoteSpeed(Math.max(2, Math.min(5, speed)))
+
         setNotes(loadedNotes)
         notesRef.current = loadedNotes.map((n, i) => ({ ...n, id: i, hit: false, missed: false }))
         setLoadedFromJson(true)
@@ -236,13 +314,20 @@ function App() {
       const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer)
 
       const generatedNotes = analyzeAudio(audioBuffer)
+      const detectedBpm = detectBPM(audioBuffer)
+      setBpm(detectedBpm)
+
+      const speed = BASE_NOTE_SPEED * (detectedBpm / BASE_BPM)
+      setNoteSpeed(Math.max(2, Math.min(5, speed)))
+
       setNotes(generatedNotes)
       notesRef.current = generatedNotes.map((n, i) => ({ ...n, id: i, hit: false, missed: false }))
 
       // Descargar JSON
       const songData = {
-        song: { title: song.title, artist: song.artist, audioFile: song.audio },
-        notes: generatedNotes
+        song: { title: song.title, artist: song.artist, audioFile: song.audio, bpm: detectedBpm },
+        notes: generatedNotes,
+        bpm: detectedBpm
       }
       downloadJSON(songData, song.notes)
 
@@ -329,7 +414,7 @@ function App() {
 
     const visibleNotes = notesRef.current.filter(note => {
       const noteScreenTime = note.time - currentTime
-      return noteScreenTime <= NOTE_SPEED && noteScreenTime >= -0.5 && !note.hit
+      return noteScreenTime <= noteSpeed && noteScreenTime >= -0.5 && !note.hit
     })
 
     notesRef.current.forEach(note => {
@@ -349,7 +434,7 @@ function App() {
     }
 
     animationRef.current = requestAnimationFrame(gameLoop)
-  }, [])
+  }, [noteSpeed])
 
   useEffect(() => {
     if (gameState === 'playing' && !isPaused) {
@@ -436,6 +521,7 @@ function App() {
           <span>Combo: {combo}x</span>
           <span>Hits: {hits}</span>
           <span>Miss: {misses}</span>
+          <span>BPM: {bpm}</span>
         </div>
         <div className="controls">
           <label className="volume-control">
@@ -502,7 +588,7 @@ function App() {
         <div className="menu">
           <h2>Listo!</h2>
           <p className="song-info">{selectedSong?.title} - {selectedSong?.artist}</p>
-          <p>{notes.length} notas {loadedFromJson ? 'cargadas' : 'generadas'}</p>
+          <p>{notes.length} notas {loadedFromJson ? 'cargadas' : 'generadas'} | {bpm} BPM</p>
           {!loadedFromJson && (
             <p className="json-hint">
               JSON descargado! Muevelo a public/songs/ para guardarlo
@@ -544,7 +630,7 @@ function App() {
                 .filter(note => note.lane === laneIndex)
                 .map(note => {
                   const noteScreenTime = note.time - currentTime
-                  const progress = 1 - (noteScreenTime / NOTE_SPEED)
+                  const progress = 1 - (noteScreenTime / noteSpeed)
                   const top = progress * 85
 
                   return (

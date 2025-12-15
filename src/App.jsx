@@ -119,7 +119,7 @@ function analyzeAudio(audioBuffer) {
   const extraNotes = []
   for (let i = 0; i < notes.length - 1; i++) {
     const gap = notes[i + 1].time - notes[i].time
-    if (gap > 0.25 && seededRandom(notes[i].time * 777) > 0.4) { // 60% prob, gap más pequeño
+    if (gap > 0.25 && seededRandom(notes[i].time * 777) > 0.4) {
       const midTime = Math.round((notes[i].time + gap / 2) * 1000) / 1000
       let lane = Math.floor(seededRandom(midTime * 999) * 5)
       if (lane === notes[i].lane) {
@@ -129,7 +129,29 @@ function analyzeAudio(audioBuffer) {
     }
   }
 
-  return [...notes, ...extraNotes].sort((a, b) => a.time - b.time)
+  const allNotes = [...notes, ...extraNotes].sort((a, b) => a.time - b.time)
+
+  // Agregar acordes (combinaciones de 2 teclas) - 20% de las notas
+  const notesWithChords = []
+  for (let i = 0; i < allNotes.length; i++) {
+    notesWithChords.push(allNotes[i])
+
+    // 20% probabilidad de agregar una segunda nota al mismo tiempo
+    if (seededRandom(allNotes[i].time * 333 + i) > 0.8) {
+      let secondLane = Math.floor(seededRandom(allNotes[i].time * 555 + i) * 5)
+      // Asegurar que sea diferente carril
+      if (secondLane === allNotes[i].lane) {
+        secondLane = (secondLane + 1) % 5
+      }
+      notesWithChords.push({
+        time: allNotes[i].time,
+        lane: secondLane,
+        isChord: true
+      })
+    }
+  }
+
+  return notesWithChords.sort((a, b) => a.time - b.time)
 }
 
 function downloadJSON(data, filename) {

@@ -121,7 +121,7 @@ function App() {
     const audioUrl = URL.createObjectURL(file)
     setCustomAudioUrl(audioUrl)
 
-    const fileName = file.name.replace('.mp3', '')
+    const fileName = file.name.replace('.mp3', '').replace(/[^a-zA-Z0-9 ]/g, ' ').trim()
     setSelectedSong({
       id: 'custom',
       title: fileName,
@@ -147,12 +147,37 @@ function App() {
       setNotes(generatedNotes)
       notesRef.current = generatedNotes.map((n, i) => ({ ...n, id: i, hit: false, missed: false }))
 
-      // Descargar JSON
+      // Guardar en el servidor
       const songData = {
         song: { title: fileName, artist: 'Custom', audioFile: file.name },
         notes: generatedNotes
       }
-      downloadJSON(songData, `${fileName}.json`)
+
+      const formData = new FormData()
+      formData.append('audio', file)
+      formData.append('title', fileName)
+      formData.append('artist', 'Custom')
+      formData.append('notes', JSON.stringify(songData))
+
+      try {
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        })
+        if (response.ok) {
+          console.log('Canción guardada en el servidor')
+          // Recargar lista de canciones
+          const songsRes = await fetch('/songs/index.json')
+          if (songsRes.ok) {
+            const data = await songsRes.json()
+            setSongs(data.songs || [])
+          }
+        }
+      } catch (uploadError) {
+        console.log('No se pudo guardar en servidor, modo offline')
+        // Descargar JSON como fallback
+        downloadJSON(songData, `${fileName}.json`)
+      }
 
       setLoadedFromJson(false)
       setGameState('ready')

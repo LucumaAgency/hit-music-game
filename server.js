@@ -55,7 +55,12 @@ const upload = multer({
 })
 
 // Endpoint para subir canción
-app.post('/api/upload', upload.single('audio'), async (req, res) => {
+app.post('/api/upload', (req, res) => {
+  upload.single('audio')(req, res, async (err) => {
+    if (err) {
+      console.error('Error en multer:', err)
+      return res.status(400).json({ error: err.message })
+    }
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No se recibió archivo de audio' })
@@ -113,8 +118,9 @@ app.post('/api/upload', upload.single('audio'), async (req, res) => {
     })
   } catch (error) {
     console.error('Error subiendo canción:', error)
-    res.status(500).json({ error: 'Error al guardar la canción' })
+    res.status(500).json({ error: 'Error al guardar la canción: ' + error.message })
   }
+  })
 })
 
 // Endpoint para obtener lista de canciones (combina predefinidas + uploads)
@@ -164,4 +170,16 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT}`)
+  console.log(`Directorio de uploads: ${UPLOADS_DIR}`)
+  // Crear directorio de uploads al iniciar
+  try {
+    if (!fs.existsSync(UPLOADS_DIR)) {
+      fs.mkdirSync(UPLOADS_DIR, { recursive: true })
+      console.log('Directorio de uploads creado')
+    } else {
+      console.log('Directorio de uploads existe')
+    }
+  } catch (e) {
+    console.error('ERROR: No se pudo crear directorio de uploads:', e.message)
+  }
 })

@@ -84,9 +84,9 @@ function analyzeAudio(audioBuffer) {
   const channelData = audioBuffer.getChannelData(0)
   const sampleRate = audioBuffer.sampleRate
   const notes = []
-  const windowSize = Math.floor(sampleRate * 0.05)
-  const threshold = 0.25 // Un poco más bajo para más notas
-  const minTimeBetweenNotes = 0.20 // Un poco menos para más notas
+  const windowSize = Math.floor(sampleRate * 0.40) // Escanear cada 400ms
+  const threshold = 0.20 // Umbral de energía
+  const minTimeBetweenNotes = 0.20
 
   let lastNoteTime = -1
   let noteIndex = 0
@@ -105,7 +105,7 @@ function analyzeAudio(audioBuffer) {
     const energy = Math.sqrt(sum / (windowEnd - i))
     const time = i / sampleRate
 
-    if (energy > threshold && max > 0.35) { // Umbral de max un poco más bajo
+    if (energy > threshold && max > 0.30) { // Umbral de amplitud
       if (time - lastNoteTime >= minTimeBetweenNotes) {
         const lane = Math.floor(seededRandom(time * 1000 + noteIndex) * 5)
         notes.push({ time: Math.round(time * 1000) / 1000, lane })

@@ -80,55 +80,107 @@ function detectBPM(audioBuffer) {
   return Math.max(60, Math.min(200, bpm))
 }
 
-function analyzeAudio(audioBuffer) {
-  const channelData = audioBuffer.getChannelData(0)
-  const sampleRate = audioBuffer.sampleRate
-  const notes = []
-  const windowSize = Math.floor(sampleRate * 0.05)
-  const threshold = 0.3
-  const minTimeBetweenNotes = MIN_TIME_BETWEEN_NOTES
+// Filtro pasa-banda simple usando promedio móvil diferencial
+function bandpassFilter(data, sampleRate, lowFreq, highFreq) {
+  const result = new Float32Array(data.length)
 
-  let lastNoteTime = -1
-  let noteIndex = 0
+  // Calcular tamaños de ventana para los filtros
+  const lowWindow = Math.max(1, Math.floor(sampleRate / highFreq / 2))
+  const highWindow = Math.max(1, Math.floor(sampleRate / lowFreq / 2))
 
-  for (let i = 0; i < channelData.length; i += windowSize) {
-    const windowEnd = Math.min(i + windowSize, channelData.length)
+  // Filtro pasa-bajos (quita frecuencias altas)
+  const lowPassed = new Float32Array(data.length)
+  for (let i = 0; i < data.length; i++) {
     let sum = 0
-    let max = 0
-
-    for (let j = i; j < windowEnd; j++) {
-      const val = Math.abs(channelData[j])
-      sum += val * val
-      if (val > max) max = val
+    const start = Math.max(0, i - lowWindow)
+    const end = Math.min(data.length, i + lowWindow)
+    for (let j = start; j < end; j++) {
+      sum += data[j]
     }
+    lowPassed[i] = sum / (end - start)
+  }
 
-    const energy = Math.sqrt(sum / (windowEnd - i))
+  // Filtro pasa-altos (quita frecuencias bajas) aplicado al resultado
+  for (let i = 0; i < data.length; i++) {
+    let sum = 0
+    const start = Math.max(0, i - highWindow)
+    const end = Math.min(data.length, i + highWindow)
+    for (let j = start; j < end; j++) {
+      sum += lowPassed[j]
+    }
+    result[i] = lowPassed[i] - sum / (end - start)
+  }
+
+  return result
+}
+
+function analyzeAudio(audioBuffer) {
+  const sampleRate = audioBuffer.sampleRate
+  const channelData = audioBuffer.getChannelData(0)
+  const notes = []
+
+  // Configuración de bandas de frecuencia para cada carril
+  const bands = [
+    { lane: 0, lowFreq: 20, highFreq: 150, name: 'bass', threshold: 0.15 },      // Bombo/Bajo
+    { lane: 1, lowFreq: 150, highFreq: 400, name: 'snare', threshold: 0.12 },    // Caja
+    { lane: 2, lowFreq: 400, highFreq: 1200, name: 'guitar', threshold: 0.10 },  // Guitarra
+    { lane: 3, lowFreq: 1200, highFreq: 4000, name: 'vocals', threshold: 0.08 }, // Voz
+    { lane: 4, lowFreq: 4000, highFreq: 10000, name: 'hihat', threshold: 0.05 }  // Hi-hats
+  ]
+
+  const windowSize = Math.floor(sampleRate * 0.05) // 50ms ventanas
+
+  // Track de última nota por carril para evitar spam
+  const lastNoteTime = [-1, -1, -1, -1, -1]
+  const minTimeBetweenNotesPerLane = 0.18
+
+  // Pre-filtrar el audio para cada banda
+  const filteredBands = bands.map(band => ({
+    ...band,
+    data: bandpassFilter(channelData, sampleRate, band.lowFreq, band.highFreq)
+  }))
+
+  // Analizar cada ventana de tiempo
+  for (let i = 0; i < channelData.length; i += windowSize) {
     const time = i / sampleRate
+    const windowEnd = Math.min(i + windowSize, channelData.length)
 
-    if (energy > threshold && max > 0.4) {
-      if (time - lastNoteTime >= minTimeBetweenNotes) {
-        const lane = Math.floor(seededRandom(time * 1000 + noteIndex) * 5)
-        notes.push({ time: Math.round(time * 1000) / 1000, lane })
-        lastNoteTime = time
-        noteIndex++
+    // Analizar cada banda de frecuencia
+    filteredBands.forEach(band => {
+      // Calcular energía en esta ventana para esta banda
+      let energy = 0
+      for (let j = i; j < windowEnd; j++) {
+        energy += band.data[j] * band.data[j]
       }
+      energy = Math.sqrt(energy / (windowEnd - i))
+
+      // Detectar pico de energía
+      if (energy > band.threshold && time - lastNoteTime[band.lane] >= minTimeBetweenNotesPerLane) {
+        notes.push({
+          time: Math.round(time * 1000) / 1000,
+          lane: band.lane,
+          instrument: band.name
+        })
+        lastNoteTime[band.lane] = time
+      }
+    })
+  }
+
+  // Ordenar por tiempo
+  const sortedNotes = notes.sort((a, b) => a.time - b.time)
+
+  // Filtrar notas demasiado cercanas en el mismo carril
+  const filteredNotes = []
+  const lastTimePerLane = [-1, -1, -1, -1, -1]
+
+  for (const note of sortedNotes) {
+    if (note.time - lastTimePerLane[note.lane] >= 0.12) {
+      filteredNotes.push(note)
+      lastTimePerLane[note.lane] = note.time
     }
   }
 
-  const extraNotes = []
-  for (let i = 0; i < notes.length - 1; i++) {
-    const gap = notes[i + 1].time - notes[i].time
-    if (gap > 0.3 && seededRandom(notes[i].time * 777) > 0.5) {
-      const midTime = Math.round((notes[i].time + gap / 2) * 1000) / 1000
-      let lane = Math.floor(seededRandom(midTime * 999) * 5)
-      if (lane === notes[i].lane) {
-        lane = (lane + 1) % 5
-      }
-      extraNotes.push({ time: midTime, lane })
-    }
-  }
-
-  return [...notes, ...extraNotes].sort((a, b) => a.time - b.time)
+  return filteredNotes
 }
 
 function downloadJSON(data, filename) {

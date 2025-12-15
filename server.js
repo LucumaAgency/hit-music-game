@@ -18,14 +18,19 @@ app.use(express.json())
 // Servir archivos estáticos del build
 app.use(express.static(path.join(__dirname, 'dist')))
 
+// Servir archivos de uploads (canciones subidas por usuarios)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
+
+// Carpeta para uploads (fuera de dist para no ser sobrescrita por deploys)
+const UPLOADS_DIR = path.join(__dirname, 'uploads', 'songs')
+
 // Configurar multer para subir archivos
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const songsDir = path.join(__dirname, 'dist', 'songs')
-    if (!fs.existsSync(songsDir)) {
-      fs.mkdirSync(songsDir, { recursive: true })
+    if (!fs.existsSync(UPLOADS_DIR)) {
+      fs.mkdirSync(UPLOADS_DIR, { recursive: true })
     }
-    cb(null, songsDir)
+    cb(null, UPLOADS_DIR)
   },
   filename: (req, file, cb) => {
     // Limpiar nombre de archivo
@@ -63,18 +68,24 @@ app.post('/api/upload', upload.single('audio'), async (req, res) => {
 
     // Guardar JSON de notas
     if (notes) {
-      const notesPath = path.join(__dirname, 'dist', 'songs', notesFilename)
+      const notesPath = path.join(UPLOADS_DIR, notesFilename)
       const notesData = JSON.parse(notes)
       fs.writeFileSync(notesPath, JSON.stringify(notesData, null, 2))
     }
 
-    // Actualizar index.json
-    const indexPath = path.join(__dirname, 'dist', 'songs', 'index.json')
+    // Actualizar index.json en uploads
+    const indexPath = path.join(UPLOADS_DIR, 'index.json')
     let indexData = { songs: [] }
 
     if (fs.existsSync(indexPath)) {
-      const indexContent = fs.readFileSync(indexPath, 'utf8')
-      indexData = JSON.parse(indexContent)
+      try {
+        const indexContent = fs.readFileSync(indexPath, 'utf8')
+        const parsed = JSON.parse(indexContent)
+        indexData = { songs: Array.isArray(parsed.songs) ? parsed.songs : [] }
+      } catch (e) {
+        console.log('Error leyendo index.json, creando nuevo')
+        indexData = { songs: [] }
+      }
     }
 
     // Verificar si la canción ya existe
@@ -83,8 +94,8 @@ app.post('/api/upload', upload.single('audio'), async (req, res) => {
       id: songId,
       title: title || songId,
       artist: artist || 'Desconocido',
-      audio: audioFilename,
-      notes: notesFilename
+      audio: `/uploads/songs/${audioFilename}`,
+      notes: `/uploads/songs/${notesFilename}`
     }
 
     if (existingIndex >= 0) {
@@ -106,16 +117,44 @@ app.post('/api/upload', upload.single('audio'), async (req, res) => {
   }
 })
 
-// Endpoint para obtener lista de canciones
+// Endpoint para obtener lista de canciones (combina predefinidas + uploads)
 app.get('/api/songs', (req, res) => {
-  const indexPath = path.join(__dirname, 'dist', 'songs', 'index.json')
+  let allSongs = []
 
-  if (fs.existsSync(indexPath)) {
-    const indexContent = fs.readFileSync(indexPath, 'utf8')
-    res.json(JSON.parse(indexContent))
-  } else {
-    res.json({ songs: [] })
+  // Canciones predefinidas en dist/songs
+  const distIndexPath = path.join(__dirname, 'dist', 'songs', 'index.json')
+  if (fs.existsSync(distIndexPath)) {
+    try {
+      const distContent = fs.readFileSync(distIndexPath, 'utf8')
+      const distData = JSON.parse(distContent)
+      if (Array.isArray(distData.songs)) {
+        // Agregar prefijo /songs/ a las rutas
+        allSongs = distData.songs.map(s => ({
+          ...s,
+          audio: s.audio.startsWith('/') ? s.audio : `/songs/${s.audio}`,
+          notes: s.notes.startsWith('/') ? s.notes : `/songs/${s.notes}`
+        }))
+      }
+    } catch (e) {
+      console.log('Error leyendo dist/songs/index.json')
+    }
   }
+
+  // Canciones subidas por usuarios en uploads/songs
+  const uploadsIndexPath = path.join(UPLOADS_DIR, 'index.json')
+  if (fs.existsSync(uploadsIndexPath)) {
+    try {
+      const uploadsContent = fs.readFileSync(uploadsIndexPath, 'utf8')
+      const uploadsData = JSON.parse(uploadsContent)
+      if (Array.isArray(uploadsData.songs)) {
+        allSongs = [...allSongs, ...uploadsData.songs]
+      }
+    } catch (e) {
+      console.log('Error leyendo uploads/songs/index.json')
+    }
+  }
+
+  res.json({ songs: allSongs })
 })
 
 // Todas las rutas no-API van al frontend

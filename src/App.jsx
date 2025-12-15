@@ -106,10 +106,16 @@ function App() {
 
   // Cargar lista de canciones al inicio
   useEffect(() => {
-    fetch('/songs/index.json')
+    fetch('/api/songs')
       .then(res => res.json())
       .then(data => setSongs(data.songs || []))
-      .catch(() => console.log('No se encontró index.json'))
+      .catch(() => {
+        // Fallback a archivo estático si no hay backend
+        fetch('/songs/index.json')
+          .then(res => res.json())
+          .then(data => setSongs(data.songs || []))
+          .catch(() => console.log('No se encontró index.json'))
+      })
   }, [])
 
   // Manejar subida de MP3
@@ -192,8 +198,9 @@ function App() {
     setSelectedSong(song)
     setGameState('analyzing')
 
-    const audioPath = `/songs/${song.audio}`
-    const notesPath = `/songs/${song.notes}`
+    // Las rutas pueden ser absolutas (/uploads/...) o relativas (archivo.mp3)
+    const audioPath = song.audio.startsWith('/') ? song.audio : `/songs/${song.audio}`
+    const notesPath = song.notes.startsWith('/') ? song.notes : `/songs/${song.notes}`
 
     // Actualizar src del audio
     if (audioRef.current) {

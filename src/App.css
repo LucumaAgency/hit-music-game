@@ -138,6 +138,58 @@ body {
   color: #888;
 }
 
+.song-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 20px 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.song-button {
+  display: flex;
+  flex-direction: column;
+  padding: 15px 30px;
+  background: linear-gradient(135deg, #1a1a2e, #2a2a4e);
+  border: 1px solid #444;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.song-button:hover {
+  background: linear-gradient(135deg, #2a2a4e, #3a3a6e);
+  border-color: #22c55e;
+  transform: scale(1.02);
+}
+
+.song-title {
+  font-size: 1.1rem;
+  color: white;
+  font-weight: bold;
+}
+
+.song-artist {
+  font-size: 0.9rem;
+  color: #888;
+}
+
+.song-info {
+  color: #22c55e;
+  font-size: 1.1rem;
+  margin-bottom: 10px;
+}
+
+.back-button {
+  background: linear-gradient(135deg, #444, #333) !important;
+  margin-left: 10px;
+}
+
+.back-button:hover {
+  box-shadow: 0 0 20px rgba(100, 100, 100, 0.5) !important;
+}
+
 .json-hint {
   font-size: 0.9rem;
   color: #eab308;

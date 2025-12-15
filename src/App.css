@@ -1,0 +1,244 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #0a0a0a;
+  color: white;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  overflow: hidden;
+}
+
+.app {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 15px 30px;
+  background: linear-gradient(180deg, #1a1a2e 0%, #0a0a0a 100%);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #333;
+}
+
+.header h1 {
+  font-size: 1.5rem;
+  background: linear-gradient(90deg, #22c55e, #3b82f6, #f97316);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.stats {
+  display: flex;
+  gap: 30px;
+  font-size: 1.1rem;
+}
+
+.stats span {
+  padding: 5px 15px;
+  background: #1a1a2e;
+  border-radius: 5px;
+  border: 1px solid #333;
+}
+
+.menu {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  background: rgba(20, 20, 40, 0.95);
+  padding: 50px 80px;
+  border-radius: 20px;
+  border: 2px solid #444;
+  z-index: 100;
+}
+
+.menu h2 {
+  font-size: 1.8rem;
+  margin-bottom: 20px;
+  color: #fff;
+}
+
+.menu p {
+  color: #aaa;
+  margin-bottom: 15px;
+}
+
+.menu button {
+  padding: 15px 50px;
+  font-size: 1.3rem;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 20px;
+}
+
+.menu button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 30px rgba(34, 197, 94, 0.5);
+}
+
+.instructions {
+  font-size: 1.2rem;
+  margin-top: 20px;
+  color: #888;
+}
+
+.json-hint {
+  font-size: 0.9rem;
+  color: #eab308;
+  background: rgba(234, 179, 8, 0.1);
+  padding: 10px;
+  border-radius: 5px;
+  margin-top: 10px;
+}
+
+.results .final-stats {
+  text-align: left;
+  margin: 20px 0;
+}
+
+.results .final-stats p {
+  margin: 10px 0;
+  font-size: 1.2rem;
+}
+
+.results .final-stats strong {
+  color: #22c55e;
+  font-size: 1.5rem;
+}
+
+.loader {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #333;
+  border-top-color: #22c55e;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 20px auto;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.game-area {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  background: linear-gradient(180deg, #0a0a0a 0%, #1a1a2e 100%);
+  position: relative;
+}
+
+.lane {
+  width: 80px;
+  height: 100%;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.02) 0%,
+    rgba(255,255,255,0.05) 50%,
+    rgba(255,255,255,0.1) 85%,
+    rgba(255,255,255,0.05) 100%
+  );
+  border-left: 1px solid #333;
+  border-right: 1px solid #333;
+  position: relative;
+  overflow: visible;
+}
+
+.note {
+  position: absolute;
+  width: 70px;
+  height: 25px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 5px;
+  transition: opacity 0.1s;
+}
+
+.hit-zone {
+  position: absolute;
+  bottom: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 70px;
+  height: 35px;
+  border: 3px solid;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s ease;
+}
+
+.hit-zone.pressed {
+  transform: translateX(-50%) scale(1.1);
+}
+
+.key-label {
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 0 10px rgba(255,255,255,0.5);
+}
+
+.feedback {
+  position: absolute;
+  bottom: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.2rem;
+  font-weight: bold;
+  animation: feedbackPop 0.3s ease-out;
+}
+
+.feedback.hit {
+  color: #22c55e;
+  text-shadow: 0 0 20px #22c55e;
+}
+
+.feedback.miss {
+  color: #ef4444;
+  text-shadow: 0 0 20px #ef4444;
+}
+
+@keyframes feedbackPop {
+  0% {
+    transform: translateX(-50%) scale(0.5);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-50%) scale(1.2) translateY(-20px);
+    opacity: 0;
+  }
+}
+
+/* Línea de hit visual */
+.game-area::before {
+  content: '';
+  position: absolute;
+  bottom: calc(10% + 17px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 450px;
+  height: 3px;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(255,255,255,0.3) 20%,
+    rgba(255,255,255,0.5) 50%,
+    rgba(255,255,255,0.3) 80%,
+    transparent
+  );
+}

@@ -173,8 +173,8 @@ app.get('/api/songs', (req, res) => {
   res.json({ songs: allSongs })
 })
 
-// Todas las rutas no-API van al frontend
-app.get('*', (req, res) => {
+// Todas las rutas no-API van al frontend (Express 5 syntax)
+app.get('/{*splat}', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'))
 })
 

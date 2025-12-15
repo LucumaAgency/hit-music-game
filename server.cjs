@@ -11,8 +11,18 @@ const PORT = process.env.PORT || 3000
 app.use(cors())
 app.use(express.json())
 
-// Servir archivos estáticos del build
-app.use(express.static(path.join(__dirname, 'dist')))
+// Servir archivos estáticos del build con MIME types correctos
+app.use(express.static(path.join(__dirname, 'dist'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript')
+    } else if (filePath.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css')
+    } else if (filePath.endsWith('.json')) {
+      res.setHeader('Content-Type', 'application/json')
+    }
+  }
+}))
 
 // Servir archivos de uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { io } from 'socket.io-client'
 import './App.css'
 
 const LANES = [
@@ -187,6 +188,21 @@ function App() {
   const [noteSpeed, setNoteSpeed] = useState(BASE_NOTE_SPEED)
   const [speedMultiplier, setSpeedMultiplier] = useState(1.0)
 
+  // Multiplayer states
+  const [isMultiplayer, setIsMultiplayer] = useState(false)
+  const [socket, setSocket] = useState(null)
+  const [playerName, setPlayerName] = useState('')
+  const [roomCode, setRoomCode] = useState('')
+  const [roomInput, setRoomInput] = useState('')
+  const [opponent, setOpponent] = useState(null)
+  const [opponentScore, setOpponentScore] = useState(0)
+  const [opponentCombo, setOpponentCombo] = useState(0)
+  const [isHost, setIsHost] = useState(false)
+  const [bothReady, setBothReady] = useState({ host: false, guest: false })
+  const [countdown, setCountdown] = useState(null)
+  const [opponentFinished, setOpponentFinished] = useState(null)
+  const [multiplayerError, setMultiplayerError] = useState('')
+
   const audioRef = useRef(null)
   const audioContextRef = useRef(null)
   const animationRef = useRef(null)
@@ -205,6 +221,77 @@ function App() {
           .catch(() => console.log('No se encontró index.json'))
       })
   }, [])
+
+  // Socket.io para multiplayer
+  useEffect(() => {
+    if (!isMultiplayer || socket) return
+
+    const newSocket = io(window.location.origin)
+    setSocket(newSocket)
+
+    newSocket.on('roomCreated', ({ roomCode }) => {
+      setRoomCode(roomCode)
+      setIsHost(true)
+      setGameState('lobby')
+    })
+
+    newSocket.on('joinedRoom', ({ roomCode, hostName }) => {
+      setRoomCode(roomCode)
+      setOpponent(hostName)
+      setIsHost(false)
+      setGameState('lobby')
+    })
+
+    newSocket.on('playerJoined', ({ guestName }) => {
+      setOpponent(guestName)
+    })
+
+    newSocket.on('error', (msg) => {
+      setMultiplayerError(msg)
+    })
+
+    newSocket.on('songSelected', (song) => {
+      setSelectedSong(song)
+    })
+
+    newSocket.on('readyUpdate', ({ hostReady, guestReady }) => {
+      setBothReady({ host: hostReady, guest: guestReady })
+    })
+
+    newSocket.on('startCountdown', () => {
+      setCountdown(3)
+    })
+
+    newSocket.on('opponentUpdate', ({ score, combo }) => {
+      setOpponentScore(score)
+      setOpponentCombo(combo)
+    })
+
+    newSocket.on('opponentFinished', (data) => {
+      setOpponentFinished(data)
+    })
+
+    newSocket.on('playerDisconnected', () => {
+      setMultiplayerError('El oponente se desconectó')
+      setOpponent(null)
+    })
+
+    return () => {
+      newSocket.disconnect()
+    }
+  }, [isMultiplayer, socket])
+
+  // Countdown timer
+  useEffect(() => {
+    if (countdown === null) return
+    if (countdown === 0) {
+      setCountdown(null)
+      startGame()
+      return
+    }
+    const timer = setTimeout(() => setCountdown(countdown - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [countdown])
 
   // Manejar subida de MP3
   const handleFileUpload = async (e) => {
@@ -404,6 +491,67 @@ function App() {
     }
   }
 
+  // Funciones Multiplayer
+  const createRoom = () => {
+    if (!playerName.trim()) {
+      setMultiplayerError('Ingresa tu nombre')
+      return
+    }
+    setIsMultiplayer(true)
+    setTimeout(() => {
+      if (socket) {
+        socket.emit('createRoom', playerName)
+      }
+    }, 100)
+  }
+
+  const joinRoom = () => {
+    if (!playerName.trim()) {
+      setMultiplayerError('Ingresa tu nombre')
+      return
+    }
+    if (!roomInput.trim()) {
+      setMultiplayerError('Ingresa el código de sala')
+      return
+    }
+    setIsMultiplayer(true)
+    setTimeout(() => {
+      if (socket) {
+        socket.emit('joinRoom', { roomCode: roomInput.toUpperCase(), playerName })
+      }
+    }, 100)
+  }
+
+  const selectSongMultiplayer = (song) => {
+    if (socket && isHost) {
+      socket.emit('selectSong', song)
+    }
+    loadSong(song)
+  }
+
+  const setReady = () => {
+    if (socket) {
+      socket.emit('playerReady')
+    }
+  }
+
+  const exitMultiplayer = () => {
+    if (socket) {
+      socket.disconnect()
+      setSocket(null)
+    }
+    setIsMultiplayer(false)
+    setRoomCode('')
+    setOpponent(null)
+    setOpponentScore(0)
+    setOpponentCombo(0)
+    setBothReady({ host: false, guest: false })
+    setCountdown(null)
+    setOpponentFinished(null)
+    setMultiplayerError('')
+    setGameState('idle')
+  }
+
   const backToMenu = async () => {
     if (audioRef.current) {
       audioRef.current.pause()
@@ -512,10 +660,18 @@ function App() {
 
       if (hitNote) {
         hitNote.hit = true
-        setHits(h => h + 1)
-        setCombo(c => c + 1)
-        setScore(s => s + 100 * (1 + Math.floor((combo + 1) / 10)))
+        const newHits = hits + 1
+        const newCombo = combo + 1
+        const newScore = score + 100 * (1 + Math.floor(newCombo / 10))
+        setHits(newHits)
+        setCombo(newCombo)
+        setScore(newScore)
         setFeedback(prev => ({ ...prev, [laneIndex]: { type: 'hit', time: Date.now() } }))
+
+        // Enviar actualización multiplayer
+        if (socket && isMultiplayer) {
+          socket.emit('scoreUpdate', { score: newScore, combo: newCombo, hits: newHits, misses })
+        }
       }
     }
 
@@ -547,6 +703,9 @@ function App() {
           <span>Hits: {hits}</span>
           <span>Miss: {misses}</span>
           <span>BPM: {bpm}</span>
+          {isMultiplayer && opponent && (
+            <span className="opponent-score">VS {opponent}: {opponentScore} ({opponentCombo}x)</span>
+          )}
         </div>
         <div className="controls">
           <label className="volume-control">
@@ -579,7 +738,7 @@ function App() {
         </div>
       </div>
 
-      {gameState === 'idle' && !selectedSong && (
+      {gameState === 'idle' && !selectedSong && !isMultiplayer && (
         <div className="menu">
           <h2>Selecciona una Cancion</h2>
           <div className="song-list">
@@ -613,7 +772,100 @@ function App() {
             Subir MP3
           </button>
 
+          <div className="upload-divider">
+            <span>Multiplayer</span>
+          </div>
+
+          <div className="multiplayer-section">
+            <input
+              type="text"
+              placeholder="Tu nombre"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              className="multiplayer-input"
+            />
+            <div className="multiplayer-buttons">
+              <button className="multiplayer-btn create" onClick={createRoom}>
+                Crear Sala
+              </button>
+              <div className="join-section">
+                <input
+                  type="text"
+                  placeholder="Código"
+                  value={roomInput}
+                  onChange={(e) => setRoomInput(e.target.value.toUpperCase())}
+                  className="room-code-input"
+                  maxLength={6}
+                />
+                <button className="multiplayer-btn join" onClick={joinRoom}>
+                  Unirse
+                </button>
+              </div>
+            </div>
+            {multiplayerError && <p className="error-msg">{multiplayerError}</p>}
+          </div>
+
           <p className="instructions">Teclas: A S J K L</p>
+        </div>
+      )}
+
+      {gameState === 'lobby' && isMultiplayer && (
+        <div className="menu lobby">
+          <h2>Sala: {roomCode}</h2>
+          <div className="players-list">
+            <div className="player-item">
+              <span className="player-name">{playerName} (Tú){isHost ? ' - Host' : ''}</span>
+              <span className={`ready-status ${isHost ? (bothReady.host ? 'ready' : '') : (bothReady.guest ? 'ready' : '')}`}>
+                {(isHost ? bothReady.host : bothReady.guest) ? 'LISTO' : 'Esperando...'}
+              </span>
+            </div>
+            {opponent ? (
+              <div className="player-item">
+                <span className="player-name">{opponent}{!isHost ? ' - Host' : ''}</span>
+                <span className={`ready-status ${!isHost ? (bothReady.host ? 'ready' : '') : (bothReady.guest ? 'ready' : '')}`}>
+                  {(!isHost ? bothReady.host : bothReady.guest) ? 'LISTO' : 'Esperando...'}
+                </span>
+              </div>
+            ) : (
+              <div className="player-item waiting">
+                <span>Esperando oponente...</span>
+              </div>
+            )}
+          </div>
+
+          {isHost && opponent && (
+            <>
+              <h3>Selecciona Canción:</h3>
+              <div className="song-list">
+                {songs.map(song => (
+                  <button
+                    key={song.id}
+                    className={`song-button ${selectedSong?.id === song.id ? 'selected' : ''}`}
+                    onClick={() => selectSongMultiplayer(song)}
+                  >
+                    <span className="song-title">{song.title}</span>
+                    <span className="song-artist">{song.artist}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {!isHost && selectedSong && (
+            <p className="song-info">Canción: {selectedSong.title} - {selectedSong.artist}</p>
+          )}
+
+          {selectedSong && gameState === 'ready' && (
+            <button className="ready-button" onClick={setReady}>
+              {(isHost ? bothReady.host : bothReady.guest) ? 'Esperando al otro...' : 'LISTO!'}
+            </button>
+          )}
+
+          {countdown !== null && (
+            <div className="countdown">{countdown}</div>
+          )}
+
+          <button className="back-button" onClick={exitMultiplayer}>Salir</button>
         </div>
       )}
 

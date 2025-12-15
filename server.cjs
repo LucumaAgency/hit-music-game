@@ -3,9 +3,22 @@ const multer = require('multer')
 const cors = require('cors')
 const path = require('path')
 const fs = require('fs')
+const http = require('http')
+const { Server } = require('socket.io')
 
 const app = express()
+const server = http.createServer(app)
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+})
+
 const PORT = process.env.PORT || 3000
+
+// Almacenar salas activas
+const rooms = new Map()
 
 // Middleware
 app.use(cors())
@@ -177,7 +190,125 @@ app.get('/{*splat}', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'))
 })
 
-app.listen(PORT, () => {
+// Socket.io - Multiplayer
+io.on('connection', (socket) => {
+  console.log('Usuario conectado:', socket.id)
+
+  // Crear sala
+  socket.on('createRoom', (playerName) => {
+    const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+    rooms.set(roomCode, {
+      host: socket.id,
+      hostName: playerName,
+      guest: null,
+      guestName: null,
+      song: null,
+      hostReady: false,
+      guestReady: false,
+      hostScore: 0,
+      guestScore: 0,
+      hostCombo: 0,
+      guestCombo: 0,
+      gameStarted: false
+    })
+    socket.join(roomCode)
+    socket.roomCode = roomCode
+    socket.emit('roomCreated', { roomCode, playerName })
+    console.log(`Sala ${roomCode} creada por ${playerName}`)
+  })
+
+  // Unirse a sala
+  socket.on('joinRoom', ({ roomCode, playerName }) => {
+    const room = rooms.get(roomCode)
+    if (!room) {
+      socket.emit('error', 'Sala no encontrada')
+      return
+    }
+    if (room.guest) {
+      socket.emit('error', 'Sala llena')
+      return
+    }
+    room.guest = socket.id
+    room.guestName = playerName
+    socket.join(roomCode)
+    socket.roomCode = roomCode
+    socket.emit('joinedRoom', { roomCode, hostName: room.hostName, playerName })
+    io.to(room.host).emit('playerJoined', { guestName: playerName })
+    console.log(`${playerName} se unió a sala ${roomCode}`)
+  })
+
+  // Seleccionar canción
+  socket.on('selectSong', (song) => {
+    const room = rooms.get(socket.roomCode)
+    if (!room) return
+    room.song = song
+    io.to(socket.roomCode).emit('songSelected', song)
+  })
+
+  // Jugador listo
+  socket.on('playerReady', () => {
+    const room = rooms.get(socket.roomCode)
+    if (!room) return
+
+    if (socket.id === room.host) {
+      room.hostReady = true
+    } else {
+      room.guestReady = true
+    }
+
+    io.to(socket.roomCode).emit('readyUpdate', {
+      hostReady: room.hostReady,
+      guestReady: room.guestReady
+    })
+
+    // Si ambos están listos, iniciar countdown
+    if (room.hostReady && room.guestReady) {
+      room.gameStarted = true
+      io.to(socket.roomCode).emit('startCountdown')
+    }
+  })
+
+  // Actualizar score
+  socket.on('scoreUpdate', ({ score, combo, hits, misses }) => {
+    const room = rooms.get(socket.roomCode)
+    if (!room) return
+
+    if (socket.id === room.host) {
+      room.hostScore = score
+      room.hostCombo = combo
+      io.to(room.guest).emit('opponentUpdate', { score, combo, hits, misses })
+    } else {
+      room.guestScore = score
+      room.guestCombo = combo
+      io.to(room.host).emit('opponentUpdate', { score, combo, hits, misses })
+    }
+  })
+
+  // Juego terminado
+  socket.on('gameFinished', ({ score, hits, misses, maxCombo }) => {
+    const room = rooms.get(socket.roomCode)
+    if (!room) return
+
+    const isHost = socket.id === room.host
+    const opponent = isHost ? room.guest : room.host
+
+    io.to(opponent).emit('opponentFinished', { score, hits, misses, maxCombo })
+  })
+
+  // Desconexión
+  socket.on('disconnect', () => {
+    console.log('Usuario desconectado:', socket.id)
+    if (socket.roomCode) {
+      const room = rooms.get(socket.roomCode)
+      if (room) {
+        io.to(socket.roomCode).emit('playerDisconnected')
+        rooms.delete(socket.roomCode)
+      }
+    }
+  })
+})
+
+server.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT}`)
   try {
     if (!fs.existsSync(UPLOADS_DIR)) {

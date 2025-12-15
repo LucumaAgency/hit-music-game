@@ -49,12 +49,12 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Remove dev index.html and commit
+      - name: Commit dist folder
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          rm index.html
+          rm -f index.html
           git add dist -f
-          git add index.html
+          git add index.html --ignore-missing || true
           git diff --staged --quiet || git commit -m "Build: update dist folder"
           git push

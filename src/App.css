@@ -82,6 +82,28 @@ body {
   cursor: pointer;
 }
 
+.speed-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #aaa;
+  font-size: 0.9rem;
+}
+
+.speed-control select {
+  padding: 5px 10px;
+  background: #1a1a2e;
+  color: white;
+  border: 1px solid #333;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.speed-control select:hover {
+  border-color: #22c55e;
+}
+
 .pause-hint {
   color: #666;
   font-size: 0.85rem;

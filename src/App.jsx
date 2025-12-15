@@ -163,6 +163,7 @@ function App() {
   const [loadedFromJson, setLoadedFromJson] = useState(false)
   const [bpm, setBpm] = useState(120)
   const [noteSpeed, setNoteSpeed] = useState(BASE_NOTE_SPEED)
+  const [speedMultiplier, setSpeedMultiplier] = useState(1.0)
 
   const audioRef = useRef(null)
   const audioContextRef = useRef(null)
@@ -413,9 +414,10 @@ function App() {
 
     const currentTime = audioRef.current.currentTime
 
+    const effectiveSpeed = noteSpeed / speedMultiplier // Mayor multiplicador = notas más rápidas
     const visibleNotes = notesRef.current.filter(note => {
       const noteScreenTime = note.time - currentTime
-      return noteScreenTime <= noteSpeed && noteScreenTime >= -0.5 && !note.hit
+      return noteScreenTime <= effectiveSpeed && noteScreenTime >= -0.5 && !note.hit
     })
 
     notesRef.current.forEach(note => {
@@ -435,7 +437,7 @@ function App() {
     }
 
     animationRef.current = requestAnimationFrame(gameLoop)
-  }, [noteSpeed])
+  }, [noteSpeed, speedMultiplier])
 
   useEffect(() => {
     if (gameState === 'playing' && !isPaused) {
@@ -536,6 +538,21 @@ function App() {
               onChange={handleVolumeChange}
             />
           </label>
+          <label className="speed-control">
+            Velocidad
+            <select
+              value={speedMultiplier}
+              onChange={(e) => setSpeedMultiplier(parseFloat(e.target.value))}
+            >
+              <option value="0.5">0.5x</option>
+              <option value="0.75">0.75x</option>
+              <option value="1">1x</option>
+              <option value="1.5">1.5x</option>
+              <option value="2">2x</option>
+              <option value="2.5">2.5x</option>
+              <option value="3">3x</option>
+            </select>
+          </label>
           <span className="pause-hint">P = Pausa | ESC = Menu</span>
         </div>
       </div>
@@ -631,7 +648,8 @@ function App() {
                 .filter(note => note.lane === laneIndex)
                 .map(note => {
                   const noteScreenTime = note.time - currentTime
-                  const progress = 1 - (noteScreenTime / noteSpeed)
+                  const effectiveSpeed = noteSpeed / speedMultiplier
+                  const progress = 1 - (noteScreenTime / effectiveSpeed)
                   const top = progress * 85
 
                   return (

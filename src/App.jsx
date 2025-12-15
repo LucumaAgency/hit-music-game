@@ -80,100 +80,56 @@ function detectBPM(audioBuffer) {
   return Math.max(60, Math.min(200, bpm))
 }
 
-// Filtro pasa-banda simple usando promedio móvil diferencial
-function bandpassFilter(data, sampleRate, lowFreq, highFreq) {
-  const result = new Float32Array(data.length)
-
-  // Calcular tamaños de ventana para los filtros
-  const lowWindow = Math.max(1, Math.floor(sampleRate / highFreq / 2))
-  const highWindow = Math.max(1, Math.floor(sampleRate / lowFreq / 2))
-
-  // Filtro pasa-bajos (quita frecuencias altas)
-  const lowPassed = new Float32Array(data.length)
-  for (let i = 0; i < data.length; i++) {
-    let sum = 0
-    const start = Math.max(0, i - lowWindow)
-    const end = Math.min(data.length, i + lowWindow)
-    for (let j = start; j < end; j++) {
-      sum += data[j]
-    }
-    lowPassed[i] = sum / (end - start)
-  }
-
-  // Filtro pasa-altos (quita frecuencias bajas) aplicado al resultado
-  for (let i = 0; i < data.length; i++) {
-    let sum = 0
-    const start = Math.max(0, i - highWindow)
-    const end = Math.min(data.length, i + highWindow)
-    for (let j = start; j < end; j++) {
-      sum += lowPassed[j]
-    }
-    result[i] = lowPassed[i] - sum / (end - start)
-  }
-
-  return result
-}
-
 function analyzeAudio(audioBuffer) {
-  const sampleRate = audioBuffer.sampleRate
   const channelData = audioBuffer.getChannelData(0)
+  const sampleRate = audioBuffer.sampleRate
   const notes = []
+  const windowSize = Math.floor(sampleRate * 0.05)
+  const threshold = 0.25 // Un poco más bajo para más notas
+  const minTimeBetweenNotes = 0.20 // Un poco menos para más notas
 
-  // Bandas priorizadas: Guitarra > Batería (bombo+caja) > Voz
-  const priorityBands = [
-    { name: 'guitar', lowFreq: 400, highFreq: 1200, threshold: 0.12, priority: 1 },   // Guitarra - máxima prioridad
-    { name: 'bass', lowFreq: 20, highFreq: 150, threshold: 0.15, priority: 2 },       // Bombo
-    { name: 'snare', lowFreq: 150, highFreq: 400, threshold: 0.12, priority: 2 },     // Caja
-    { name: 'vocals', lowFreq: 1200, highFreq: 4000, threshold: 0.10, priority: 3 },  // Voz
-  ]
-
-  const windowSize = Math.floor(sampleRate * 0.04) // 40ms ventanas para más detalle
-
-  // Pre-filtrar el audio para cada banda
-  const filteredBands = priorityBands.map(band => ({
-    ...band,
-    data: bandpassFilter(channelData, sampleRate, band.lowFreq, band.highFreq)
-  }))
-
+  let lastNoteTime = -1
   let noteIndex = 0
 
-  // Analizar cada ventana de tiempo
   for (let i = 0; i < channelData.length; i += windowSize) {
-    const time = i / sampleRate
     const windowEnd = Math.min(i + windowSize, channelData.length)
+    let sum = 0
+    let max = 0
 
-    // Verificar cada banda por prioridad
-    let detected = false
+    for (let j = i; j < windowEnd; j++) {
+      const val = Math.abs(channelData[j])
+      sum += val * val
+      if (val > max) max = val
+    }
 
-    // Ordenar por prioridad
-    const sortedBands = [...filteredBands].sort((a, b) => a.priority - b.priority)
+    const energy = Math.sqrt(sum / (windowEnd - i))
+    const time = i / sampleRate
 
-    for (const band of sortedBands) {
-      if (detected) break
-
-      let energy = 0
-      for (let j = i; j < windowEnd; j++) {
-        energy += band.data[j] * band.data[j]
-      }
-      energy = Math.sqrt(energy / (windowEnd - i))
-
-      // Si esta banda tiene suficiente energía, generar nota
-      if (energy > band.threshold) {
-        // Asignar carril aleatorio (con semilla para consistencia)
+    if (energy > threshold && max > 0.35) { // Umbral de max un poco más bajo
+      if (time - lastNoteTime >= minTimeBetweenNotes) {
         const lane = Math.floor(seededRandom(time * 1000 + noteIndex) * 5)
-
-        notes.push({
-          time: Math.round(time * 1000) / 1000,
-          lane: lane,
-          instrument: band.name
-        })
+        notes.push({ time: Math.round(time * 1000) / 1000, lane })
+        lastNoteTime = time
         noteIndex++
-        detected = true
       }
     }
   }
 
-  return notes
+  // Agregar notas extra en huecos grandes (60% probabilidad)
+  const extraNotes = []
+  for (let i = 0; i < notes.length - 1; i++) {
+    const gap = notes[i + 1].time - notes[i].time
+    if (gap > 0.25 && seededRandom(notes[i].time * 777) > 0.4) { // 60% prob, gap más pequeño
+      const midTime = Math.round((notes[i].time + gap / 2) * 1000) / 1000
+      let lane = Math.floor(seededRandom(midTime * 999) * 5)
+      if (lane === notes[i].lane) {
+        lane = (lane + 1) % 5
+      }
+      extraNotes.push({ time: midTime, lane })
+    }
+  }
+
+  return [...notes, ...extraNotes].sort((a, b) => a.time - b.time)
 }
 
 function downloadJSON(data, filename) {

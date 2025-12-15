@@ -190,7 +190,6 @@ function App() {
 
   // Multiplayer states
   const [isMultiplayer, setIsMultiplayer] = useState(false)
-  const [socket, setSocket] = useState(null)
   const [playerName, setPlayerName] = useState('')
   const [roomCode, setRoomCode] = useState('')
   const [roomInput, setRoomInput] = useState('')
@@ -202,6 +201,7 @@ function App() {
   const [countdown, setCountdown] = useState(null)
   const [opponentFinished, setOpponentFinished] = useState(null)
   const [multiplayerError, setMultiplayerError] = useState('')
+  const socketRef = useRef(null)
 
   const audioRef = useRef(null)
   const audioContextRef = useRef(null)
@@ -222,20 +222,22 @@ function App() {
       })
   }, [])
 
-  // Socket.io para multiplayer
-  useEffect(() => {
-    if (!isMultiplayer || socket) return
+  // Inicializar socket cuando se necesite
+  const initSocket = useCallback(() => {
+    if (socketRef.current) return socketRef.current
 
     const newSocket = io(window.location.origin)
-    setSocket(newSocket)
+    socketRef.current = newSocket
 
     newSocket.on('roomCreated', ({ roomCode }) => {
+      console.log('Sala creada:', roomCode)
       setRoomCode(roomCode)
       setIsHost(true)
       setGameState('lobby')
     })
 
     newSocket.on('joinedRoom', ({ roomCode, hostName }) => {
+      console.log('Unido a sala:', roomCode)
       setRoomCode(roomCode)
       setOpponent(hostName)
       setIsHost(false)
@@ -243,10 +245,12 @@ function App() {
     })
 
     newSocket.on('playerJoined', ({ guestName }) => {
+      console.log('Jugador unido:', guestName)
       setOpponent(guestName)
     })
 
     newSocket.on('error', (msg) => {
+      console.log('Error:', msg)
       setMultiplayerError(msg)
     })
 
@@ -276,10 +280,8 @@ function App() {
       setOpponent(null)
     })
 
-    return () => {
-      newSocket.disconnect()
-    }
-  }, [isMultiplayer, socket])
+    return newSocket
+  }, [])
 
   // Countdown timer
   useEffect(() => {
@@ -497,12 +499,10 @@ function App() {
       setMultiplayerError('Ingresa tu nombre')
       return
     }
+    setMultiplayerError('')
     setIsMultiplayer(true)
-    setTimeout(() => {
-      if (socket) {
-        socket.emit('createRoom', playerName)
-      }
-    }, 100)
+    const socket = initSocket()
+    socket.emit('createRoom', playerName)
   }
 
   const joinRoom = () => {
@@ -514,31 +514,29 @@ function App() {
       setMultiplayerError('Ingresa el código de sala')
       return
     }
+    setMultiplayerError('')
     setIsMultiplayer(true)
-    setTimeout(() => {
-      if (socket) {
-        socket.emit('joinRoom', { roomCode: roomInput.toUpperCase(), playerName })
-      }
-    }, 100)
+    const socket = initSocket()
+    socket.emit('joinRoom', { roomCode: roomInput.toUpperCase(), playerName })
   }
 
   const selectSongMultiplayer = (song) => {
-    if (socket && isHost) {
-      socket.emit('selectSong', song)
+    if (socketRef.current && isHost) {
+      socketRef.current.emit('selectSong', song)
     }
     loadSong(song)
   }
 
   const setReady = () => {
-    if (socket) {
-      socket.emit('playerReady')
+    if (socketRef.current) {
+      socketRef.current.emit('playerReady')
     }
   }
 
   const exitMultiplayer = () => {
-    if (socket) {
-      socket.disconnect()
-      setSocket(null)
+    if (socketRef.current) {
+      socketRef.current.disconnect()
+      socketRef.current = null
     }
     setIsMultiplayer(false)
     setRoomCode('')
@@ -669,8 +667,8 @@ function App() {
         setFeedback(prev => ({ ...prev, [laneIndex]: { type: 'hit', time: Date.now() } }))
 
         // Enviar actualización multiplayer
-        if (socket && isMultiplayer) {
-          socket.emit('scoreUpdate', { score: newScore, combo: newCombo, hits: newHits, misses })
+        if (socketRef.current && isMultiplayer) {
+          socketRef.current.emit('scoreUpdate', { score: newScore, combo: newCombo, hits: newHits, misses })
         }
       }
     }

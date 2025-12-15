@@ -284,7 +284,7 @@ function App() {
     }
   }
 
-  const backToMenu = () => {
+  const backToMenu = async () => {
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current.currentTime = 0
@@ -298,6 +298,17 @@ function App() {
     setGameState('idle')
     setNotes([])
     setActiveNotes([])
+
+    // Recargar lista de canciones
+    try {
+      const res = await fetch('/songs/index.json')
+      if (res.ok) {
+        const data = await res.json()
+        setSongs(data.songs || [])
+      }
+    } catch (e) {
+      console.log('Error recargando canciones')
+    }
   }
 
   const gameLoop = useCallback(() => {

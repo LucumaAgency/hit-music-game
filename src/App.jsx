@@ -204,6 +204,15 @@ function App() {
   const [pendingSongLoad, setPendingSongLoad] = useState(null)
   const socketRef = useRef(null)
 
+  // YouTube states
+  const [youtubeUrl, setYoutubeUrl] = useState('')
+  const [youtubeLoading, setYoutubeLoading] = useState(false)
+  const [youtubeError, setYoutubeError] = useState('')
+  const [ytPlayerReady, setYtPlayerReady] = useState(false)
+  const [audioOffset, setAudioOffset] = useState(0) // Offset para sincronización
+  const ytPlayerRef = useRef(null)
+  const ytApiLoaded = useRef(false)
+
   const audioRef = useRef(null)
   const audioContextRef = useRef(null)
   const animationRef = useRef(null)
@@ -222,6 +231,110 @@ function App() {
           .catch(() => console.log('No se encontró index.json'))
       })
   }, [])
+
+  // Cargar YouTube IFrame API
+  useEffect(() => {
+    if (ytApiLoaded.current) return
+
+    const tag = document.createElement('script')
+    tag.src = 'https://www.youtube.com/iframe_api'
+    const firstScriptTag = document.getElementsByTagName('script')[0]
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag)
+
+    window.onYouTubeIframeAPIReady = () => {
+      ytApiLoaded.current = true
+      console.log('YouTube IFrame API loaded')
+    }
+  }, [])
+
+  // Agregar canción de YouTube
+  const addYouTubeSong = async () => {
+    if (!youtubeUrl.trim()) {
+      setYoutubeError('Ingresa una URL de YouTube')
+      return
+    }
+
+    setYoutubeLoading(true)
+    setYoutubeError('')
+
+    try {
+      const response = await fetch('/api/youtube/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: youtubeUrl })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error procesando video')
+      }
+
+      // Recargar lista de canciones
+      const songsRes = await fetch('/api/songs')
+      if (songsRes.ok) {
+        const songsData = await songsRes.json()
+        setSongs(songsData.songs || [])
+      }
+
+      setYoutubeUrl('')
+      setYoutubeError('')
+
+      if (data.alreadyExists) {
+        alert('Esta canción ya existe en la biblioteca')
+      } else {
+        alert(`Canción "${data.song.title}" agregada correctamente!`)
+      }
+
+    } catch (error) {
+      console.error('Error adding YouTube song:', error)
+      setYoutubeError(error.message)
+    } finally {
+      setYoutubeLoading(false)
+    }
+  }
+
+  // Inicializar YouTube player para una canción
+  const initYouTubePlayer = (videoId) => {
+    if (!window.YT || !window.YT.Player) {
+      console.error('YouTube API not loaded')
+      return
+    }
+
+    // Destruir player anterior si existe
+    if (ytPlayerRef.current) {
+      ytPlayerRef.current.destroy()
+      ytPlayerRef.current = null
+    }
+
+    setYtPlayerReady(false)
+
+    ytPlayerRef.current = new window.YT.Player('youtube-player', {
+      height: '200',
+      width: '350',
+      videoId: videoId,
+      playerVars: {
+        autoplay: 0,
+        controls: 0,
+        disablekb: 1,
+        fs: 0,
+        modestbranding: 1,
+        rel: 0
+      },
+      events: {
+        onReady: () => {
+          console.log('YouTube player ready')
+          setYtPlayerReady(true)
+        },
+        onStateChange: (event) => {
+          // YT.PlayerState.ENDED = 0
+          if (event.data === 0) {
+            setGameState('finished')
+          }
+        }
+      }
+    })
+  }
 
   // Inicializar socket cuando se necesite
   const initSocket = useCallback(() => {
@@ -397,7 +510,41 @@ function App() {
     setSelectedSong(song)
     setGameState('analyzing')
 
-    // Las rutas pueden ser absolutas (/uploads/...) o relativas (archivo.mp3)
+    // Si es canción de YouTube
+    if (song.type === 'youtube' && song.videoId) {
+      try {
+        const notesPath = song.notes
+        const jsonResponse = await fetch(notesPath)
+
+        if (!jsonResponse.ok) {
+          throw new Error('No se encontraron las notas')
+        }
+
+        const songData = await jsonResponse.json()
+        const loadedNotes = songData.notes || songData
+        const loadedBpm = songData.bpm || 120
+
+        setBpm(loadedBpm)
+        const speed = BASE_NOTE_SPEED * (loadedBpm / BASE_BPM)
+        setNoteSpeed(Math.max(2, Math.min(5, speed)))
+
+        setNotes(loadedNotes)
+        notesRef.current = loadedNotes.map((n, i) => ({ ...n, id: i, hit: false, missed: false }))
+        setLoadedFromJson(true)
+
+        // Inicializar YouTube player
+        initYouTubePlayer(song.videoId)
+        setGameState('ready')
+        return
+
+      } catch (error) {
+        console.error('Error cargando canción YouTube:', error)
+        setGameState('idle')
+        return
+      }
+    }
+
+    // Canciones normales (MP3)
     const audioPath = song.audio.startsWith('/') ? song.audio : `/songs/${song.audio}`
     const notesPath = song.notes.startsWith('/') ? song.notes : `/songs/${song.notes}`
 
@@ -474,9 +621,17 @@ function App() {
     setFeedback({})
     notesRef.current = notesRef.current.map(n => ({ ...n, hit: false, missed: false }))
 
-    audioRef.current.currentTime = 0
-    audioRef.current.volume = volume
-    audioRef.current.play()
+    // YouTube o MP3
+    if (selectedSong?.type === 'youtube' && ytPlayerRef.current) {
+      ytPlayerRef.current.seekTo(0)
+      ytPlayerRef.current.setVolume(volume * 100)
+      ytPlayerRef.current.playVideo()
+    } else if (audioRef.current) {
+      audioRef.current.currentTime = 0
+      audioRef.current.volume = volume
+      audioRef.current.play()
+    }
+
     setIsPaused(false)
     setGameState('playing')
   }
@@ -485,20 +640,32 @@ function App() {
     if (gameState !== 'playing' && gameState !== 'paused') return
 
     if (isPaused) {
-      audioRef.current.play()
+      // Resume
+      if (selectedSong?.type === 'youtube' && ytPlayerRef.current) {
+        ytPlayerRef.current.playVideo()
+      } else if (audioRef.current) {
+        audioRef.current.play()
+      }
       setIsPaused(false)
       setGameState('playing')
     } else {
-      audioRef.current.pause()
+      // Pause
+      if (selectedSong?.type === 'youtube' && ytPlayerRef.current) {
+        ytPlayerRef.current.pauseVideo()
+      } else if (audioRef.current) {
+        audioRef.current.pause()
+      }
       setIsPaused(true)
       setGameState('paused')
     }
-  }, [gameState, isPaused])
+  }, [gameState, isPaused, selectedSong])
 
   const handleVolumeChange = (e) => {
     const newVolume = parseFloat(e.target.value)
     setVolume(newVolume)
-    if (audioRef.current) {
+    if (selectedSong?.type === 'youtube' && ytPlayerRef.current) {
+      ytPlayerRef.current.setVolume(newVolume * 100)
+    } else if (audioRef.current) {
       audioRef.current.volume = newVolume
     }
   }
@@ -561,6 +728,16 @@ function App() {
   }
 
   const backToMenu = async () => {
+    // Detener YouTube player si existe
+    if (ytPlayerRef.current) {
+      try {
+        ytPlayerRef.current.stopVideo()
+        ytPlayerRef.current.destroy()
+        ytPlayerRef.current = null
+      } catch (e) {}
+    }
+    setYtPlayerReady(false)
+
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current.currentTime = 0
@@ -577,7 +754,7 @@ function App() {
 
     // Recargar lista de canciones
     try {
-      const res = await fetch('/songs/index.json')
+      const res = await fetch('/api/songs')
       if (res.ok) {
         const data = await res.json()
         setSongs(data.songs || [])
@@ -587,10 +764,25 @@ function App() {
     }
   }
 
-  const gameLoop = useCallback(() => {
-    if (!audioRef.current) return
+  // Helper para obtener tiempo actual (YouTube o Audio)
+  const getCurrentTime = useCallback(() => {
+    if (selectedSong?.type === 'youtube' && ytPlayerRef.current) {
+      try {
+        return ytPlayerRef.current.getCurrentTime() + audioOffset
+      } catch (e) {
+        return 0
+      }
+    }
+    return audioRef.current?.currentTime || 0
+  }, [selectedSong, audioOffset])
 
-    const currentTime = audioRef.current.currentTime
+  const gameLoop = useCallback(() => {
+    // Verificar que tenemos un reproductor activo
+    const isYouTube = selectedSong?.type === 'youtube'
+    if (!isYouTube && !audioRef.current) return
+    if (isYouTube && !ytPlayerRef.current) return
+
+    const currentTime = getCurrentTime()
 
     const effectiveSpeed = noteSpeed / speedMultiplier // Mayor multiplicador = notas más rápidas
     const visibleNotes = notesRef.current.filter(note => {
@@ -609,7 +801,12 @@ function App() {
 
     setActiveNotes([...visibleNotes])
 
-    if (audioRef.current.ended) {
+    // Verificar si terminó (YouTube se maneja con onStateChange, pero también chequeamos aquí)
+    const isEnded = isYouTube
+      ? (ytPlayerRef.current?.getPlayerState?.() === 0) // YT.PlayerState.ENDED
+      : audioRef.current?.ended
+
+    if (isEnded) {
       // Emit final results in multiplayer
       if (socketRef.current && isMultiplayer) {
         socketRef.current.emit('gameFinished', {
@@ -625,7 +822,7 @@ function App() {
     }
 
     animationRef.current = requestAnimationFrame(gameLoop)
-  }, [noteSpeed, speedMultiplier, score, hits, misses, maxCombo, isMultiplayer])
+  }, [noteSpeed, speedMultiplier, score, hits, misses, maxCombo, isMultiplayer, selectedSong, getCurrentTime])
 
   useEffect(() => {
     if (gameState === 'playing' && !isPaused) {
@@ -707,11 +904,22 @@ function App() {
     }
   }, [gameState, combo, togglePause, isPaused])
 
-  const currentTime = audioRef.current?.currentTime || 0
+  // Tiempo actual para renderizar notas
+  const currentTime = selectedSong?.type === 'youtube' && ytPlayerRef.current
+    ? (ytPlayerRef.current.getCurrentTime?.() || 0) + audioOffset
+    : (audioRef.current?.currentTime || 0)
 
   return (
     <div className="app">
       <audio ref={audioRef} />
+
+      {/* YouTube Player Container - siempre presente pero oculto cuando no se usa */}
+      <div
+        id="youtube-player-container"
+        className={`youtube-player-container ${selectedSong?.type === 'youtube' && (gameState === 'playing' || gameState === 'paused') ? 'visible' : ''}`}
+      >
+        <div id="youtube-player"></div>
+      </div>
 
       <div className="header">
         <h1>Guitar Flash Clone</h1>
@@ -763,10 +971,13 @@ function App() {
             {songs.map(song => (
               <button
                 key={song.id}
-                className="song-button"
+                className={`song-button ${song.type === 'youtube' ? 'youtube-song' : ''}`}
                 onClick={() => loadSong(song)}
               >
-                <span className="song-title">{song.title}</span>
+                <span className="song-title">
+                  {song.type === 'youtube' && <span className="yt-badge">YT</span>}
+                  {song.title}
+                </span>
                 <span className="song-artist">{song.artist}</span>
               </button>
             ))}
@@ -789,6 +1000,32 @@ function App() {
           >
             Subir MP3
           </button>
+
+          <div className="upload-divider">
+            <span>o agrega desde YouTube</span>
+          </div>
+
+          <div className="youtube-section">
+            <input
+              type="text"
+              placeholder="URL de YouTube (ej: youtube.com/watch?v=...)"
+              value={youtubeUrl}
+              onChange={(e) => setYoutubeUrl(e.target.value)}
+              className="youtube-input"
+              disabled={youtubeLoading}
+            />
+            <button
+              className="youtube-button"
+              onClick={addYouTubeSong}
+              disabled={youtubeLoading}
+            >
+              {youtubeLoading ? 'Procesando...' : 'Agregar'}
+            </button>
+            {youtubeError && <p className="error-msg">{youtubeError}</p>}
+            {youtubeLoading && (
+              <p className="youtube-hint">Descargando y analizando audio... puede tomar un minuto</p>
+            )}
+          </div>
 
           <div className="upload-divider">
             <span>Multiplayer</span>

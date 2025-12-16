@@ -5,6 +5,11 @@ const path = require('path')
 const fs = require('fs')
 const http = require('http')
 const { Server } = require('socket.io')
+const { spawn, execSync } = require('child_process')
+
+// Carpetas
+const TEMP_DIR = path.join(__dirname, 'temp')
+const YOUTUBE_DIR = path.join(__dirname, 'uploads', 'youtube')
 
 const app = express()
 const server = http.createServer(app)
@@ -85,6 +90,332 @@ const upload = multer({
     }
   },
   limits: { fileSize: 50 * 1024 * 1024 }
+})
+
+// =====================
+// YOUTUBE FUNCTIONS
+// =====================
+
+// Extraer video ID de URL de YouTube
+function extractYouTubeId(url) {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+    /^([a-zA-Z0-9_-]{11})$/
+  ]
+  for (const pattern of patterns) {
+    const match = url.match(pattern)
+    if (match) return match[1]
+  }
+  return null
+}
+
+// Función de random con seed (igual que en frontend)
+function seededRandom(seed) {
+  const x = Math.sin(seed * 9999) * 10000
+  return x - Math.floor(x)
+}
+
+// Detectar BPM del audio
+function detectBPM(channelData, sampleRate) {
+  const windowSize = Math.floor(sampleRate * 0.05)
+  const peaks = []
+
+  for (let i = 0; i < channelData.length; i += windowSize) {
+    const windowEnd = Math.min(i + windowSize, channelData.length)
+    let sum = 0
+    let max = 0
+
+    for (let j = i; j < windowEnd; j++) {
+      const val = Math.abs(channelData[j])
+      sum += val * val
+      if (val > max) max = val
+    }
+
+    const energy = Math.sqrt(sum / (windowEnd - i))
+    const time = i / sampleRate
+
+    if (energy > 0.3 && max > 0.4) {
+      peaks.push(time)
+    }
+  }
+
+  const intervals = []
+  for (let i = 1; i < peaks.length; i++) {
+    const interval = peaks[i] - peaks[i - 1]
+    if (interval > 0.2 && interval < 2) {
+      intervals.push(interval)
+    }
+  }
+
+  if (intervals.length === 0) return 120
+
+  const buckets = {}
+  intervals.forEach(interval => {
+    const bucket = Math.round(interval * 10) / 10
+    buckets[bucket] = (buckets[bucket] || 0) + 1
+  })
+
+  let mostCommonInterval = 0.5
+  let maxCount = 0
+  Object.entries(buckets).forEach(([interval, count]) => {
+    if (count > maxCount) {
+      maxCount = count
+      mostCommonInterval = parseFloat(interval)
+    }
+  })
+
+  const bpm = Math.round(60 / mostCommonInterval)
+  return Math.max(60, Math.min(200, bpm))
+}
+
+// Analizar audio y generar notas
+function analyzeAudioBuffer(channelData, sampleRate) {
+  const notes = []
+  const windowSize = Math.floor(sampleRate * 0.40)
+  const threshold = 0.20
+  const minTimeBetweenNotes = 0.20
+
+  let lastNoteTime = -1
+  let noteIndex = 0
+
+  for (let i = 0; i < channelData.length; i += windowSize) {
+    const windowEnd = Math.min(i + windowSize, channelData.length)
+    let sum = 0
+    let max = 0
+
+    for (let j = i; j < windowEnd; j++) {
+      const val = Math.abs(channelData[j])
+      sum += val * val
+      if (val > max) max = val
+    }
+
+    const energy = Math.sqrt(sum / (windowEnd - i))
+    const time = i / sampleRate
+
+    if (energy > threshold && max > 0.30) {
+      if (time - lastNoteTime >= minTimeBetweenNotes) {
+        const lane = Math.floor(seededRandom(time * 1000 + noteIndex) * 5)
+        notes.push({ time: Math.round(time * 1000) / 1000, lane })
+        lastNoteTime = time
+        noteIndex++
+      }
+    }
+  }
+
+  // Agregar notas extra en huecos grandes
+  const extraNotes = []
+  for (let i = 0; i < notes.length - 1; i++) {
+    const gap = notes[i + 1].time - notes[i].time
+    if (gap > 0.25 && seededRandom(notes[i].time * 777) > 0.4) {
+      const midTime = Math.round((notes[i].time + gap / 2) * 1000) / 1000
+      let lane = Math.floor(seededRandom(midTime * 999) * 5)
+      if (lane === notes[i].lane) {
+        lane = (lane + 1) % 5
+      }
+      extraNotes.push({ time: midTime, lane })
+    }
+  }
+
+  const allNotes = [...notes, ...extraNotes].sort((a, b) => a.time - b.time)
+
+  // Agregar acordes (20% probabilidad)
+  const notesWithChords = []
+  for (let i = 0; i < allNotes.length; i++) {
+    notesWithChords.push(allNotes[i])
+    if (seededRandom(allNotes[i].time * 333 + i) > 0.8) {
+      let secondLane = Math.floor(seededRandom(allNotes[i].time * 555 + i) * 5)
+      if (secondLane === allNotes[i].lane) {
+        secondLane = (secondLane + 1) % 5
+      }
+      notesWithChords.push({
+        time: allNotes[i].time,
+        lane: secondLane,
+        isChord: true
+      })
+    }
+  }
+
+  return notesWithChords.sort((a, b) => a.time - b.time)
+}
+
+// Obtener info del video con yt-dlp
+async function getYouTubeInfo(videoId) {
+  return new Promise((resolve, reject) => {
+    const ytdlp = spawn('yt-dlp', [
+      '--dump-json',
+      '--no-download',
+      `https://www.youtube.com/watch?v=${videoId}`
+    ])
+
+    let stdout = ''
+    let stderr = ''
+
+    ytdlp.stdout.on('data', (data) => { stdout += data })
+    ytdlp.stderr.on('data', (data) => { stderr += data })
+
+    ytdlp.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`yt-dlp error: ${stderr}`))
+        return
+      }
+      try {
+        const info = JSON.parse(stdout)
+        resolve({
+          title: info.title || 'Sin título',
+          artist: info.uploader || info.channel || 'Desconocido',
+          duration: info.duration || 0,
+          thumbnail: info.thumbnail
+        })
+      } catch (e) {
+        reject(new Error('Error parsing video info'))
+      }
+    })
+  })
+}
+
+// Descargar audio de YouTube
+async function downloadYouTubeAudio(videoId, outputPath) {
+  return new Promise((resolve, reject) => {
+    const ytdlp = spawn('yt-dlp', [
+      '-x',
+      '--audio-format', 'wav',
+      '--audio-quality', '0',
+      '-o', outputPath,
+      `https://www.youtube.com/watch?v=${videoId}`
+    ])
+
+    let stderr = ''
+    ytdlp.stderr.on('data', (data) => { stderr += data })
+
+    ytdlp.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`Download error: ${stderr}`))
+        return
+      }
+      resolve(outputPath)
+    })
+  })
+}
+
+// Endpoint para agregar canción de YouTube
+app.post('/api/youtube/add', async (req, res) => {
+  const { url } = req.body
+
+  if (!url) {
+    return res.status(400).json({ error: 'URL requerida' })
+  }
+
+  const videoId = extractYouTubeId(url)
+  if (!videoId) {
+    return res.status(400).json({ error: 'URL de YouTube inválida' })
+  }
+
+  // Verificar si ya existe
+  const youtubeIndexPath = path.join(YOUTUBE_DIR, 'index.json')
+  let existingSongs = { songs: [] }
+  if (fs.existsSync(youtubeIndexPath)) {
+    try {
+      existingSongs = JSON.parse(fs.readFileSync(youtubeIndexPath, 'utf8'))
+      const existing = existingSongs.songs.find(s => s.videoId === videoId)
+      if (existing) {
+        return res.json({ success: true, message: 'Canción ya existe', song: existing, alreadyExists: true })
+      }
+    } catch (e) {}
+  }
+
+  // Crear directorios si no existen
+  if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true })
+  if (!fs.existsSync(YOUTUBE_DIR)) fs.mkdirSync(YOUTUBE_DIR, { recursive: true })
+
+  const tempFile = path.join(TEMP_DIR, `${videoId}.wav`)
+
+  try {
+    // Obtener info del video
+    console.log(`[YouTube] Obteniendo info de ${videoId}...`)
+    const videoInfo = await getYouTubeInfo(videoId)
+
+    // Descargar audio
+    console.log(`[YouTube] Descargando audio...`)
+    res.write(JSON.stringify({ status: 'downloading', message: 'Descargando audio...' }) + '\n')
+
+    await downloadYouTubeAudio(videoId, tempFile)
+
+    // Verificar que el archivo existe
+    if (!fs.existsSync(tempFile)) {
+      throw new Error('No se pudo descargar el audio')
+    }
+
+    // Analizar audio
+    console.log(`[YouTube] Analizando audio...`)
+
+    // Dynamic import for audio-decode (ES module)
+    const audioDecode = await import('audio-decode')
+    const audioBuffer = fs.readFileSync(tempFile)
+    const decoded = await audioDecode.default(audioBuffer)
+
+    const channelData = decoded.getChannelData(0)
+    const sampleRate = decoded.sampleRate
+
+    const notes = analyzeAudioBuffer(channelData, sampleRate)
+    const bpm = detectBPM(channelData, sampleRate)
+
+    console.log(`[YouTube] Generadas ${notes.length} notas, BPM: ${bpm}`)
+
+    // Guardar JSON de notas
+    const notesData = {
+      song: {
+        title: videoInfo.title,
+        artist: videoInfo.artist,
+        videoId: videoId,
+        bpm: bpm
+      },
+      notes: notes,
+      bpm: bpm
+    }
+
+    const notesFilename = `${videoId}.json`
+    fs.writeFileSync(path.join(YOUTUBE_DIR, notesFilename), JSON.stringify(notesData, null, 2))
+
+    // Actualizar index
+    const songEntry = {
+      id: `yt-${videoId}`,
+      videoId: videoId,
+      title: videoInfo.title,
+      artist: videoInfo.artist,
+      duration: videoInfo.duration,
+      thumbnail: videoInfo.thumbnail,
+      notes: `/uploads/youtube/${notesFilename}`,
+      type: 'youtube',
+      bpm: bpm
+    }
+
+    existingSongs.songs.push(songEntry)
+    fs.writeFileSync(youtubeIndexPath, JSON.stringify(existingSongs, null, 2))
+
+    // Eliminar archivo temporal
+    try {
+      fs.unlinkSync(tempFile)
+      console.log(`[YouTube] Archivo temporal eliminado`)
+    } catch (e) {
+      console.error(`[YouTube] Error eliminando temp:`, e.message)
+    }
+
+    res.json({
+      success: true,
+      message: 'Canción procesada correctamente',
+      song: songEntry
+    })
+
+  } catch (error) {
+    console.error('[YouTube] Error:', error.message)
+
+    // Limpiar archivo temporal si existe
+    try {
+      if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile)
+    } catch (e) {}
+
+    res.status(500).json({ error: error.message })
+  }
 })
 
 // Endpoint para subir canción
@@ -178,6 +509,18 @@ app.get('/api/songs', (req, res) => {
       const uploadsData = JSON.parse(uploadsContent)
       if (Array.isArray(uploadsData.songs)) {
         allSongs = [...allSongs, ...uploadsData.songs]
+      }
+    } catch (e) {}
+  }
+
+  // YouTube songs
+  const youtubeIndexPath = path.join(YOUTUBE_DIR, 'index.json')
+  if (fs.existsSync(youtubeIndexPath)) {
+    try {
+      const youtubeContent = fs.readFileSync(youtubeIndexPath, 'utf8')
+      const youtubeData = JSON.parse(youtubeContent)
+      if (Array.isArray(youtubeData.songs)) {
+        allSongs = [...allSongs, ...youtubeData.songs]
       }
     } catch (e) {}
   }

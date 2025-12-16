@@ -331,14 +331,14 @@ function httpsRequest(options, postData = null) {
 async function getYouTubeAudioUrl(videoId) {
   console.log(`[RapidAPI] Intentando obtener audio para: ${videoId}`)
 
-  // Usar youtube-mp36 API
+  // Usar coolguruji-youtube-to-mp3-download API
   const options = {
-    hostname: 'youtube-mp36.p.rapidapi.com',
-    path: `/dl?id=${videoId}`,
+    hostname: 'coolguruji-youtube-to-mp3-download-v1.p.rapidapi.com',
+    path: `/?id=${videoId}`,
     method: 'GET',
     headers: {
       'X-RapidAPI-Key': RAPIDAPI_KEY,
-      'X-RapidAPI-Host': 'youtube-mp36.p.rapidapi.com'
+      'X-RapidAPI-Host': 'coolguruji-youtube-to-mp3-download-v1.p.rapidapi.com'
     }
   }
 
@@ -353,12 +353,14 @@ async function getYouTubeAudioUrl(videoId) {
 
     const response = result.data
 
-    // youtube-mp36 devuelve: { link, title, progress, duration, status }
-    if (response.status === 'fail') {
-      throw new Error(response.msg || 'La API falló al procesar el video')
+    // Verificar si hay error
+    if (response.error || response.status === 'fail') {
+      throw new Error(response.error || response.msg || 'La API falló al procesar el video')
     }
 
-    const downloadUrl = response.link
+    // Buscar URL de descarga en campos comunes
+    const downloadUrl = response.link || response.url || response.download ||
+                        response.mp3 || response.audio || response.dlink
 
     if (!downloadUrl) {
       console.error('[RapidAPI] Respuesta completa:', JSON.stringify(response))

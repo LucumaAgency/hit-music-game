@@ -331,14 +331,14 @@ function httpsRequest(options, postData = null) {
 async function getYouTubeAudioUrl(videoId) {
   console.log(`[RapidAPI] Intentando obtener audio para: ${videoId}`)
 
-  // Intentar con youtube-to-mp315 API
+  // Usar youtube-mp36 API
   const options = {
-    hostname: 'youtube-to-mp315.p.rapidapi.com',
-    path: `/download?url=https://www.youtube.com/watch?v=${videoId}&format=mp3`,
+    hostname: 'youtube-mp36.p.rapidapi.com',
+    path: `/dl?id=${videoId}`,
     method: 'GET',
     headers: {
       'X-RapidAPI-Key': RAPIDAPI_KEY,
-      'X-RapidAPI-Host': 'youtube-to-mp315.p.rapidapi.com'
+      'X-RapidAPI-Host': 'youtube-mp36.p.rapidapi.com'
     }
   }
 
@@ -348,17 +348,19 @@ async function getYouTubeAudioUrl(videoId) {
     console.log('[RapidAPI] Respuesta:', JSON.stringify(result.data).substring(0, 500))
 
     if (result.status !== 200) {
-      throw new Error(`API respondió con status ${result.status}`)
+      throw new Error(`API respondió con status ${result.status}: ${JSON.stringify(result.data)}`)
     }
 
     const response = result.data
 
-    // Buscar URL de descarga en diferentes campos posibles
-    const downloadUrl = response.url || response.link || response.downloadUrl ||
-                        response.download_url || response.mp3 || response.audio
+    // youtube-mp36 devuelve: { link, title, progress, duration, status }
+    if (response.status === 'fail') {
+      throw new Error(response.msg || 'La API falló al procesar el video')
+    }
+
+    const downloadUrl = response.link
 
     if (!downloadUrl) {
-      // Mostrar toda la respuesta para debug
       console.error('[RapidAPI] Respuesta completa:', JSON.stringify(response))
       throw new Error('No se encontró URL de descarga en la respuesta')
     }

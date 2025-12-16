@@ -305,65 +305,42 @@ async function getYouTubeInfo(videoId) {
   })
 }
 
-// Descargar audio usando Cobalt API (llamada directa)
-async function downloadWithCobalt(videoId) {
-  const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`
+// Descargar audio usando Convert2MP3s API (sin autenticación)
+async function getYouTubeAudioUrl(videoId) {
+  const youtubeUrl = encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)
+  const apiUrl = `https://convert2mp3s.com/api/single/mp3?url=${youtubeUrl}`
 
   return new Promise((resolve, reject) => {
-    const postData = JSON.stringify({
-      url: youtubeUrl,
-      downloadMode: 'audio',
-      audioFormat: 'mp3'
-    })
-
-    const options = {
-      hostname: 'api.cobalt.tools',
-      port: 443,
-      path: '/',
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData)
-      }
-    }
-
-    const req = https.request(options, (res) => {
+    https.get(apiUrl, (res) => {
       let data = ''
       res.on('data', chunk => { data += chunk })
       res.on('end', () => {
         try {
           const response = JSON.parse(data)
 
-          // Cobalt puede responder con diferentes formatos
-          if (response.status === 'error') {
-            reject(new Error(response.error?.code || 'Cobalt API error'))
+          if (response.error) {
+            reject(new Error(response.error || 'API error'))
             return
           }
 
-          // Buscar URL de descarga en la respuesta
-          const downloadUrl = response.url || response.audio?.url || response.data?.url
+          // La API devuelve un link de descarga
+          const downloadUrl = response.url || response.link || response.download
 
           if (!downloadUrl) {
-            console.error('[Cobalt] Respuesta:', JSON.stringify(response))
-            reject(new Error('No se obtuvo URL de descarga de Cobalt'))
+            console.error('[Convert2MP3s] Respuesta:', JSON.stringify(response))
+            reject(new Error('No se obtuvo URL de descarga'))
             return
           }
 
           resolve(downloadUrl)
         } catch (e) {
-          console.error('[Cobalt] Error parseando respuesta:', data)
-          reject(new Error('Error parseando respuesta de Cobalt'))
+          console.error('[Convert2MP3s] Error parseando respuesta:', data.substring(0, 500))
+          reject(new Error('Error parseando respuesta de la API'))
         }
       })
+    }).on('error', (e) => {
+      reject(new Error(`Error conectando a API: ${e.message}`))
     })
-
-    req.on('error', (e) => {
-      reject(new Error(`Error conectando a Cobalt: ${e.message}`))
-    })
-
-    req.write(postData)
-    req.end()
   })
 }
 
@@ -404,9 +381,9 @@ app.post('/api/youtube/add', async (req, res) => {
     console.log(`[YouTube] Obteniendo info de ${videoId}...`)
     const videoInfo = await getYouTubeInfo(videoId)
 
-    // Obtener URL de descarga via Cobalt
-    console.log(`[YouTube] Obteniendo URL de audio via Cobalt...`)
-    const audioUrl = await downloadWithCobalt(videoId)
+    // Obtener URL de descarga via Convert2MP3s
+    console.log(`[YouTube] Obteniendo URL de audio...`)
+    const audioUrl = await getYouTubeAudioUrl(videoId)
 
     // Descargar el archivo de audio
     console.log(`[YouTube] Descargando audio desde: ${audioUrl.substring(0, 50)}...`)

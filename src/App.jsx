@@ -205,13 +205,17 @@ function App() {
   const socketRef = useRef(null)
 
   // YouTube states
-  const [youtubeUrl, setYoutubeUrl] = useState('')
-  const [youtubeLoading, setYoutubeLoading] = useState(false)
-  const [youtubeError, setYoutubeError] = useState('')
   const [ytPlayerReady, setYtPlayerReady] = useState(false)
   const [audioOffset, setAudioOffset] = useState(0) // Offset para sincronización
   const ytPlayerRef = useRef(null)
   const ytApiLoaded = useRef(false)
+
+  // Upload form states
+  const [uploadYoutubeUrl, setUploadYoutubeUrl] = useState('')
+  const [uploadTitle, setUploadTitle] = useState('')
+  const [uploadArtist, setUploadArtist] = useState('')
+  const [uploadLoading, setUploadLoading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
 
   const audioRef = useRef(null)
   const audioContextRef = useRef(null)
@@ -246,53 +250,6 @@ function App() {
       console.log('YouTube IFrame API loaded')
     }
   }, [])
-
-  // Agregar canción de YouTube
-  const addYouTubeSong = async () => {
-    if (!youtubeUrl.trim()) {
-      setYoutubeError('Ingresa una URL de YouTube')
-      return
-    }
-
-    setYoutubeLoading(true)
-    setYoutubeError('')
-
-    try {
-      const response = await fetch('/api/youtube/add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: youtubeUrl })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error procesando video')
-      }
-
-      // Recargar lista de canciones
-      const songsRes = await fetch('/api/songs')
-      if (songsRes.ok) {
-        const songsData = await songsRes.json()
-        setSongs(songsData.songs || [])
-      }
-
-      setYoutubeUrl('')
-      setYoutubeError('')
-
-      if (data.alreadyExists) {
-        alert('Esta canción ya existe en la biblioteca')
-      } else {
-        alert(`Canción "${data.song.title}" agregada correctamente!`)
-      }
-
-    } catch (error) {
-      console.error('Error adding YouTube song:', error)
-      setYoutubeError(error.message)
-    } finally {
-      setYoutubeLoading(false)
-    }
-  }
 
   // Inicializar YouTube player para una canción
   const initYouTubePlayer = (videoId) => {
@@ -418,90 +375,69 @@ function App() {
     return () => clearTimeout(timer)
   }, [countdown])
 
-  // Manejar subida de MP3
+  // Manejar subida de MP3 con formulario completo
   const handleFileUpload = async (e) => {
     const file = e.target.files[0]
     if (!file) return
 
-    // Crear URL temporal para el archivo
-    const audioUrl = URL.createObjectURL(file)
-    setCustomAudioUrl(audioUrl)
-
     const fileName = file.name.replace('.mp3', '').replace(/[^a-zA-Z0-9 ]/g, ' ').trim()
-    setSelectedSong({
-      id: 'custom',
-      title: fileName,
-      artist: 'Archivo Local',
-      audio: audioUrl,
-      notes: null
-    })
 
+    // Si no hay título, usar nombre del archivo
+    const title = uploadTitle.trim() || fileName
+    const artist = uploadArtist.trim() || 'Desconocido'
+
+    setUploadLoading(true)
+    setUploadError('')
     setGameState('analyzing')
 
-    // Actualizar src del audio
-    if (audioRef.current) {
-      audioRef.current.src = audioUrl
-    }
-
-    // Analizar el audio
     try {
-      const arrayBuffer = await file.arrayBuffer()
-      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)()
-      const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer)
-
-      const generatedNotes = analyzeAudio(audioBuffer)
-      const detectedBpm = detectBPM(audioBuffer)
-      setBpm(detectedBpm)
-
-      // Calcular velocidad basada en BPM (más BPM = notas más rápidas)
-      const speed = BASE_NOTE_SPEED * (detectedBpm / BASE_BPM)
-      setNoteSpeed(Math.max(2, Math.min(5, speed))) // Limitar entre 2 y 5
-
-      setNotes(generatedNotes)
-      notesRef.current = generatedNotes.map((n, i) => ({ ...n, id: i, hit: false, missed: false }))
-
-      // Guardar en el servidor
-      const songData = {
-        song: { title: fileName, artist: 'Custom', audioFile: file.name, bpm: detectedBpm },
-        notes: generatedNotes,
-        bpm: detectedBpm
-      }
-
+      // Subir al servidor para análisis
       const formData = new FormData()
       formData.append('audio', file)
-      formData.append('title', fileName)
-      formData.append('artist', 'Custom')
-      formData.append('notes', JSON.stringify(songData))
-
-      try {
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData
-        })
-        if (response.ok) {
-          const result = await response.json()
-          console.log('Canción guardada en el servidor:', result)
-          // Recargar lista de canciones desde API
-          const songsRes = await fetch('/api/songs')
-          if (songsRes.ok) {
-            const data = await songsRes.json()
-            setSongs(data.songs || [])
-          }
-        } else {
-          console.error('Error del servidor:', response.status)
-        }
-      } catch (uploadError) {
-        console.error('Error subiendo al servidor:', uploadError)
-        alert('No se pudo guardar en el servidor. Descargando JSON como respaldo.')
-        // Descargar JSON como fallback
-        downloadJSON(songData, `${fileName}.json`)
+      formData.append('title', title)
+      formData.append('artist', artist)
+      if (uploadYoutubeUrl.trim()) {
+        formData.append('youtubeUrl', uploadYoutubeUrl.trim())
       }
 
-      setLoadedFromJson(false)
-      setGameState('ready')
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      })
+
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || 'Error del servidor')
+      }
+
+      const result = await response.json()
+      console.log('Canción guardada:', result)
+
+      // Recargar lista de canciones
+      const songsRes = await fetch('/api/songs')
+      if (songsRes.ok) {
+        const data = await songsRes.json()
+        setSongs(data.songs || [])
+      }
+
+      // Limpiar formulario
+      setUploadTitle('')
+      setUploadArtist('')
+      setUploadYoutubeUrl('')
+
+      // Cargar la canción recién subida
+      if (result.song) {
+        loadSong(result.song)
+      }
+
+      alert(`Canción "${title}" agregada correctamente!`)
+
     } catch (error) {
-      console.error('Error analizando audio:', error)
+      console.error('Error subiendo canción:', error)
+      setUploadError(error.message)
       setGameState('idle')
+    } finally {
+      setUploadLoading(false)
     }
   }
 
@@ -987,44 +923,48 @@ function App() {
             <span>o sube tu propio MP3</span>
           </div>
 
-          <input
-            type="file"
-            ref={fileInputRef}
-            accept=".mp3,audio/mpeg"
-            onChange={handleFileUpload}
-            style={{ display: 'none' }}
-          />
-          <button
-            className="upload-button"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            Subir MP3
-          </button>
-
-          <div className="upload-divider">
-            <span>o agrega desde YouTube</span>
-          </div>
-
-          <div className="youtube-section">
+          <div className="upload-section">
             <input
               type="text"
-              placeholder="URL de YouTube (ej: youtube.com/watch?v=...)"
-              value={youtubeUrl}
-              onChange={(e) => setYoutubeUrl(e.target.value)}
-              className="youtube-input"
-              disabled={youtubeLoading}
+              placeholder="Título (opcional)"
+              value={uploadTitle}
+              onChange={(e) => setUploadTitle(e.target.value)}
+              className="upload-input"
+              disabled={uploadLoading}
+            />
+            <input
+              type="text"
+              placeholder="Artista (opcional)"
+              value={uploadArtist}
+              onChange={(e) => setUploadArtist(e.target.value)}
+              className="upload-input"
+              disabled={uploadLoading}
+            />
+            <input
+              type="text"
+              placeholder="URL de YouTube para embed (opcional)"
+              value={uploadYoutubeUrl}
+              onChange={(e) => setUploadYoutubeUrl(e.target.value)}
+              className="upload-input youtube-url"
+              disabled={uploadLoading}
+            />
+            <p className="upload-hint">Si agregas YouTube URL, el video se usará para reproducir la música</p>
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".mp3,audio/mpeg"
+              onChange={handleFileUpload}
+              style={{ display: 'none' }}
             />
             <button
-              className="youtube-button"
-              onClick={addYouTubeSong}
-              disabled={youtubeLoading}
+              className="upload-button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadLoading}
             >
-              {youtubeLoading ? 'Procesando...' : 'Agregar'}
+              {uploadLoading ? 'Subiendo...' : 'Seleccionar MP3 y Subir'}
             </button>
-            {youtubeError && <p className="error-msg">{youtubeError}</p>}
-            {youtubeLoading && (
-              <p className="youtube-hint">Descargando y analizando audio... puede tomar un minuto</p>
-            )}
+            {uploadError && <p className="error-msg">{uploadError}</p>}
           </div>
 
           <div className="upload-divider">

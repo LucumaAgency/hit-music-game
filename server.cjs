@@ -305,42 +305,55 @@ async function getYouTubeInfo(videoId) {
   })
 }
 
-// Descargar audio usando Convert2MP3s API (sin autenticación)
-async function getYouTubeAudioUrl(videoId) {
-  const youtubeUrl = encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)
-  const apiUrl = `https://convert2mp3s.com/api/single/mp3?url=${youtubeUrl}`
+// Descargar audio usando RapidAPI YouTube MP3
+const RAPIDAPI_KEY = '3d139d3860msh923f812efb2ff32p17c909jsn0e158354a77e'
 
+async function getYouTubeAudioUrl(videoId) {
   return new Promise((resolve, reject) => {
-    https.get(apiUrl, (res) => {
+    const options = {
+      hostname: 'youtube-mp36.p.rapidapi.com',
+      path: `/dl?id=${videoId}`,
+      method: 'GET',
+      headers: {
+        'X-RapidAPI-Key': RAPIDAPI_KEY,
+        'X-RapidAPI-Host': 'youtube-mp36.p.rapidapi.com'
+      }
+    }
+
+    const req = https.request(options, (res) => {
       let data = ''
       res.on('data', chunk => { data += chunk })
       res.on('end', () => {
         try {
           const response = JSON.parse(data)
+          console.log('[RapidAPI] Respuesta:', JSON.stringify(response).substring(0, 300))
 
-          if (response.error) {
-            reject(new Error(response.error || 'API error'))
+          if (response.status === 'fail' || response.error) {
+            reject(new Error(response.msg || response.error || 'API error'))
             return
           }
 
-          // La API devuelve un link de descarga
-          const downloadUrl = response.url || response.link || response.download
+          // La API devuelve un link de descarga en 'link'
+          const downloadUrl = response.link
 
           if (!downloadUrl) {
-            console.error('[Convert2MP3s] Respuesta:', JSON.stringify(response))
             reject(new Error('No se obtuvo URL de descarga'))
             return
           }
 
           resolve(downloadUrl)
         } catch (e) {
-          console.error('[Convert2MP3s] Error parseando respuesta:', data.substring(0, 500))
+          console.error('[RapidAPI] Error parseando respuesta:', data.substring(0, 500))
           reject(new Error('Error parseando respuesta de la API'))
         }
       })
-    }).on('error', (e) => {
-      reject(new Error(`Error conectando a API: ${e.message}`))
     })
+
+    req.on('error', (e) => {
+      reject(new Error(`Error conectando a RapidAPI: ${e.message}`))
+    })
+
+    req.end()
   })
 }
 
@@ -381,8 +394,8 @@ app.post('/api/youtube/add', async (req, res) => {
     console.log(`[YouTube] Obteniendo info de ${videoId}...`)
     const videoInfo = await getYouTubeInfo(videoId)
 
-    // Obtener URL de descarga via Convert2MP3s
-    console.log(`[YouTube] Obteniendo URL de audio...`)
+    // Obtener URL de descarga via RapidAPI
+    console.log(`[YouTube] Obteniendo URL de audio via RapidAPI...`)
     const audioUrl = await getYouTubeAudioUrl(videoId)
 
     // Descargar el archivo de audio

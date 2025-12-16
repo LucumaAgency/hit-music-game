@@ -297,12 +297,31 @@ async function downloadYouTubeAudio(videoId, outputPath) {
   })
 }
 
+// Verificar si yt-dlp está instalado
+function checkYtDlp() {
+  try {
+    execSync('which yt-dlp', { stdio: 'ignore' })
+    return true
+  } catch (e) {
+    return false
+  }
+}
+
 // Endpoint para agregar canción de YouTube
 app.post('/api/youtube/add', async (req, res) => {
   const { url } = req.body
 
   if (!url) {
     return res.status(400).json({ error: 'URL requerida' })
+  }
+
+  // Verificar que yt-dlp esté instalado
+  if (!checkYtDlp()) {
+    console.error('[YouTube] yt-dlp no está instalado')
+    return res.status(500).json({
+      error: 'yt-dlp no está instalado en el servidor. Contacta al administrador.',
+      details: 'Instalar con: pip3 install yt-dlp'
+    })
   }
 
   const videoId = extractYouTubeId(url)

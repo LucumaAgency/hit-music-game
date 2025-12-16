@@ -895,6 +895,13 @@ function App() {
               <option value="2">2x</option>
               <option value="2.5">2.5x</option>
               <option value="3">3x</option>
+              <option value="4">4x</option>
+              <option value="5">5x</option>
+              <option value="6">6x</option>
+              <option value="7">7x</option>
+              <option value="8">8x</option>
+              <option value="9">9x</option>
+              <option value="10">10x</option>
             </select>
           </label>
           <span className="pause-hint">P = Pausa | ESC = Menu</span>

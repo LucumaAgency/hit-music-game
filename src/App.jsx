@@ -199,6 +199,7 @@ function App() {
   const [isHost, setIsHost] = useState(false)
   const [bothReady, setBothReady] = useState({ host: false, guest: false })
   const [countdown, setCountdown] = useState(null)
+  const [resumeCountdown, setResumeCountdown] = useState(null)
   const [opponentFinished, setOpponentFinished] = useState(null)
   const [multiplayerError, setMultiplayerError] = useState('')
   const [pendingSongLoad, setPendingSongLoad] = useState(null)
@@ -363,7 +364,7 @@ function App() {
     }
   }, [pendingSongLoad, isMultiplayer, isHost])
 
-  // Countdown timer
+  // Countdown timer (multiplayer)
   useEffect(() => {
     if (countdown === null) return
     if (countdown === 0) {
@@ -374,6 +375,25 @@ function App() {
     const timer = setTimeout(() => setCountdown(countdown - 1), 1000)
     return () => clearTimeout(timer)
   }, [countdown])
+
+  // Resume countdown timer (after unpause)
+  useEffect(() => {
+    if (resumeCountdown === null) return
+    if (resumeCountdown === 0) {
+      setResumeCountdown(null)
+      // Actually resume the game
+      if (selectedSong?.type === 'youtube' && ytPlayerRef.current) {
+        ytPlayerRef.current.playVideo()
+      } else if (audioRef.current) {
+        audioRef.current.play()
+      }
+      setIsPaused(false)
+      setGameState('playing')
+      return
+    }
+    const timer = setTimeout(() => setResumeCountdown(resumeCountdown - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [resumeCountdown, selectedSong])
 
   // Manejar subida de MP3 con formulario completo
   const handleFileUpload = async (e) => {
@@ -576,14 +596,8 @@ function App() {
     if (gameState !== 'playing' && gameState !== 'paused') return
 
     if (isPaused) {
-      // Resume
-      if (selectedSong?.type === 'youtube' && ytPlayerRef.current) {
-        ytPlayerRef.current.playVideo()
-      } else if (audioRef.current) {
-        audioRef.current.play()
-      }
-      setIsPaused(false)
-      setGameState('playing')
+      // Resume with countdown
+      setResumeCountdown(1) // 1 segundo de espera
     } else {
       // Pause
       if (selectedSong?.type === 'youtube' && ytPlayerRef.current) {
@@ -1103,10 +1117,19 @@ function App() {
 
       {gameState === 'paused' && (
         <div className="menu pause-menu">
-          <h2>PAUSA</h2>
-          <p>Presiona P para continuar</p>
-          <button onClick={togglePause}>Continuar</button>
-          <button className="back-button" onClick={backToMenu}>Salir al Menu</button>
+          {resumeCountdown !== null ? (
+            <>
+              <div className="resume-countdown">{resumeCountdown}</div>
+              <p>Preparate...</p>
+            </>
+          ) : (
+            <>
+              <h2>PAUSA</h2>
+              <p>Presiona P para continuar</p>
+              <button onClick={togglePause}>Continuar</button>
+              <button className="back-button" onClick={backToMenu}>Salir al Menu</button>
+            </>
+          )}
         </div>
       )}
 
@@ -1170,6 +1193,13 @@ function App() {
 
       {(gameState === 'playing' || gameState === 'finished' || gameState === 'paused') && (
         <div className="game-area">
+          {/* Combo grande estilo DDR */}
+          {combo > 0 && gameState === 'playing' && (
+            <div className="combo-display">
+              <span className="combo-number">{combo}</span>
+              <span className="combo-label">COMBO</span>
+            </div>
+          )}
           {LANES.map((lane, laneIndex) => (
             <div key={laneIndex} className="lane">
               {activeNotes

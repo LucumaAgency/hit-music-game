@@ -308,53 +308,66 @@ async function getYouTubeInfo(videoId) {
 // Descargar audio usando RapidAPI YouTube MP3
 const RAPIDAPI_KEY = '3d139d3860msh923f812efb2ff32p17c909jsn0e158354a77e'
 
-async function getYouTubeAudioUrl(videoId) {
+// Helper para hacer requests HTTPS
+function httpsRequest(options, postData = null) {
   return new Promise((resolve, reject) => {
-    const options = {
-      hostname: 'youtube-mp36.p.rapidapi.com',
-      path: `/dl?id=${videoId}`,
-      method: 'GET',
-      headers: {
-        'X-RapidAPI-Key': RAPIDAPI_KEY,
-        'X-RapidAPI-Host': 'youtube-mp36.p.rapidapi.com'
-      }
-    }
-
     const req = https.request(options, (res) => {
       let data = ''
       res.on('data', chunk => { data += chunk })
       res.on('end', () => {
         try {
-          const response = JSON.parse(data)
-          console.log('[RapidAPI] Respuesta:', JSON.stringify(response).substring(0, 300))
-
-          if (response.status === 'fail' || response.error) {
-            reject(new Error(response.msg || response.error || 'API error'))
-            return
-          }
-
-          // La API devuelve un link de descarga en 'link'
-          const downloadUrl = response.link
-
-          if (!downloadUrl) {
-            reject(new Error('No se obtuvo URL de descarga'))
-            return
-          }
-
-          resolve(downloadUrl)
+          resolve({ status: res.statusCode, data: JSON.parse(data) })
         } catch (e) {
-          console.error('[RapidAPI] Error parseando respuesta:', data.substring(0, 500))
-          reject(new Error('Error parseando respuesta de la API'))
+          resolve({ status: res.statusCode, data: data })
         }
       })
     })
-
-    req.on('error', (e) => {
-      reject(new Error(`Error conectando a RapidAPI: ${e.message}`))
-    })
-
+    req.on('error', reject)
+    if (postData) req.write(postData)
     req.end()
   })
+}
+
+async function getYouTubeAudioUrl(videoId) {
+  console.log(`[RapidAPI] Intentando obtener audio para: ${videoId}`)
+
+  // Intentar con youtube-to-mp315 API
+  const options = {
+    hostname: 'youtube-to-mp315.p.rapidapi.com',
+    path: `/download?url=https://www.youtube.com/watch?v=${videoId}&format=mp3`,
+    method: 'GET',
+    headers: {
+      'X-RapidAPI-Key': RAPIDAPI_KEY,
+      'X-RapidAPI-Host': 'youtube-to-mp315.p.rapidapi.com'
+    }
+  }
+
+  try {
+    const result = await httpsRequest(options)
+    console.log('[RapidAPI] Status:', result.status)
+    console.log('[RapidAPI] Respuesta:', JSON.stringify(result.data).substring(0, 500))
+
+    if (result.status !== 200) {
+      throw new Error(`API respondió con status ${result.status}`)
+    }
+
+    const response = result.data
+
+    // Buscar URL de descarga en diferentes campos posibles
+    const downloadUrl = response.url || response.link || response.downloadUrl ||
+                        response.download_url || response.mp3 || response.audio
+
+    if (!downloadUrl) {
+      // Mostrar toda la respuesta para debug
+      console.error('[RapidAPI] Respuesta completa:', JSON.stringify(response))
+      throw new Error('No se encontró URL de descarga en la respuesta')
+    }
+
+    return downloadUrl
+  } catch (error) {
+    console.error('[RapidAPI] Error:', error.message)
+    throw error
+  }
 }
 
 // Endpoint para agregar canción de YouTube

@@ -4,8 +4,8 @@ const cors = require('cors')
 const path = require('path')
 const fs = require('fs')
 const http = require('http')
+const https = require('https')
 const { Server } = require('socket.io')
-const { spawn, execSync } = require('child_process')
 
 // Carpetas
 const TEMP_DIR = path.join(__dirname, 'temp')
@@ -238,73 +238,133 @@ function analyzeAudioBuffer(channelData, sampleRate) {
   return notesWithChords.sort((a, b) => a.time - b.time)
 }
 
-// Obtener info del video con yt-dlp
+// Descargar archivo desde URL
+function downloadFile(url, outputPath) {
+  return new Promise((resolve, reject) => {
+    const protocol = url.startsWith('https') ? https : http
+    const file = fs.createWriteStream(outputPath)
+
+    protocol.get(url, (response) => {
+      // Handle redirects
+      if (response.statusCode === 301 || response.statusCode === 302) {
+        downloadFile(response.headers.location, outputPath)
+          .then(resolve)
+          .catch(reject)
+        return
+      }
+
+      if (response.statusCode !== 200) {
+        reject(new Error(`HTTP ${response.statusCode}`))
+        return
+      }
+
+      response.pipe(file)
+      file.on('finish', () => {
+        file.close()
+        resolve(outputPath)
+      })
+    }).on('error', (err) => {
+      fs.unlink(outputPath, () => {})
+      reject(err)
+    })
+  })
+}
+
+// Obtener info del video desde YouTube oEmbed API (gratis, sin auth)
 async function getYouTubeInfo(videoId) {
   return new Promise((resolve, reject) => {
-    const ytdlp = spawn('yt-dlp', [
-      '--dump-json',
-      '--no-download',
-      `https://www.youtube.com/watch?v=${videoId}`
-    ])
+    const url = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
 
-    let stdout = ''
-    let stderr = ''
-
-    ytdlp.stdout.on('data', (data) => { stdout += data })
-    ytdlp.stderr.on('data', (data) => { stderr += data })
-
-    ytdlp.on('close', (code) => {
-      if (code !== 0) {
-        reject(new Error(`yt-dlp error: ${stderr}`))
-        return
-      }
-      try {
-        const info = JSON.parse(stdout)
-        resolve({
-          title: info.title || 'Sin título',
-          artist: info.uploader || info.channel || 'Desconocido',
-          duration: info.duration || 0,
-          thumbnail: info.thumbnail
-        })
-      } catch (e) {
-        reject(new Error('Error parsing video info'))
-      }
+    https.get(url, (response) => {
+      let data = ''
+      response.on('data', chunk => { data += chunk })
+      response.on('end', () => {
+        try {
+          const info = JSON.parse(data)
+          resolve({
+            title: info.title || 'Sin título',
+            artist: info.author_name || 'Desconocido',
+            thumbnail: info.thumbnail_url
+          })
+        } catch (e) {
+          // Si falla oEmbed, usar valores por defecto
+          resolve({
+            title: `YouTube Video ${videoId}`,
+            artist: 'YouTube',
+            thumbnail: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+          })
+        }
+      })
+    }).on('error', () => {
+      resolve({
+        title: `YouTube Video ${videoId}`,
+        artist: 'YouTube',
+        thumbnail: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+      })
     })
   })
 }
 
-// Descargar audio de YouTube
-async function downloadYouTubeAudio(videoId, outputPath) {
+// Descargar audio usando Cobalt API (llamada directa)
+async function downloadWithCobalt(videoId) {
+  const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`
+
   return new Promise((resolve, reject) => {
-    const ytdlp = spawn('yt-dlp', [
-      '-x',
-      '--audio-format', 'wav',
-      '--audio-quality', '0',
-      '-o', outputPath,
-      `https://www.youtube.com/watch?v=${videoId}`
-    ])
-
-    let stderr = ''
-    ytdlp.stderr.on('data', (data) => { stderr += data })
-
-    ytdlp.on('close', (code) => {
-      if (code !== 0) {
-        reject(new Error(`Download error: ${stderr}`))
-        return
-      }
-      resolve(outputPath)
+    const postData = JSON.stringify({
+      url: youtubeUrl,
+      downloadMode: 'audio',
+      audioFormat: 'mp3'
     })
-  })
-}
 
-// Verificar si yt-dlp está instalado
-function checkYtDlp() {
-  try {
-    execSync('which yt-dlp', { stdio: 'ignore' })
-    return true
-  } catch (e) {
-    return false
-  }
+    const options = {
+      hostname: 'api.cobalt.tools',
+      port: 443,
+      path: '/',
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    }
+
+    const req = https.request(options, (res) => {
+      let data = ''
+      res.on('data', chunk => { data += chunk })
+      res.on('end', () => {
+        try {
+          const response = JSON.parse(data)
+
+          // Cobalt puede responder con diferentes formatos
+          if (response.status === 'error') {
+            reject(new Error(response.error?.code || 'Cobalt API error'))
+            return
+          }
+
+          // Buscar URL de descarga en la respuesta
+          const downloadUrl = response.url || response.audio?.url || response.data?.url
+
+          if (!downloadUrl) {
+            console.error('[Cobalt] Respuesta:', JSON.stringify(response))
+            reject(new Error('No se obtuvo URL de descarga de Cobalt'))
+            return
+          }
+
+          resolve(downloadUrl)
+        } catch (e) {
+          console.error('[Cobalt] Error parseando respuesta:', data)
+          reject(new Error('Error parseando respuesta de Cobalt'))
+        }
+      })
+    })
+
+    req.on('error', (e) => {
+      reject(new Error(`Error conectando a Cobalt: ${e.message}`))
+    })
+
+    req.write(postData)
+    req.end()
+  })
 }
 
 // Endpoint para agregar canción de YouTube
@@ -313,15 +373,6 @@ app.post('/api/youtube/add', async (req, res) => {
 
   if (!url) {
     return res.status(400).json({ error: 'URL requerida' })
-  }
-
-  // Verificar que yt-dlp esté instalado
-  if (!checkYtDlp()) {
-    console.error('[YouTube] yt-dlp no está instalado')
-    return res.status(500).json({
-      error: 'yt-dlp no está instalado en el servidor. Contacta al administrador.',
-      details: 'Instalar con: pip3 install yt-dlp'
-    })
   }
 
   const videoId = extractYouTubeId(url)
@@ -346,18 +397,20 @@ app.post('/api/youtube/add', async (req, res) => {
   if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true })
   if (!fs.existsSync(YOUTUBE_DIR)) fs.mkdirSync(YOUTUBE_DIR, { recursive: true })
 
-  const tempFile = path.join(TEMP_DIR, `${videoId}.wav`)
+  const tempFile = path.join(TEMP_DIR, `${videoId}.mp3`)
 
   try {
     // Obtener info del video
     console.log(`[YouTube] Obteniendo info de ${videoId}...`)
     const videoInfo = await getYouTubeInfo(videoId)
 
-    // Descargar audio
-    console.log(`[YouTube] Descargando audio...`)
-    res.write(JSON.stringify({ status: 'downloading', message: 'Descargando audio...' }) + '\n')
+    // Obtener URL de descarga via Cobalt
+    console.log(`[YouTube] Obteniendo URL de audio via Cobalt...`)
+    const audioUrl = await downloadWithCobalt(videoId)
 
-    await downloadYouTubeAudio(videoId, tempFile)
+    // Descargar el archivo de audio
+    console.log(`[YouTube] Descargando audio desde: ${audioUrl.substring(0, 50)}...`)
+    await downloadFile(audioUrl, tempFile)
 
     // Verificar que el archivo existe
     if (!fs.existsSync(tempFile)) {
@@ -401,7 +454,6 @@ app.post('/api/youtube/add', async (req, res) => {
       videoId: videoId,
       title: videoInfo.title,
       artist: videoInfo.artist,
-      duration: videoInfo.duration,
       thumbnail: videoInfo.thumbnail,
       notes: `/uploads/youtube/${notesFilename}`,
       type: 'youtube',

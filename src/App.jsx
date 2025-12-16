@@ -720,7 +720,7 @@ function App() {
 
     const currentTime = getCurrentTime()
 
-    const effectiveSpeed = noteSpeed / speedMultiplier // Mayor multiplicador = notas más rápidas
+    const effectiveSpeed = noteSpeed / (1 + (speedMultiplier - 1) * 0.5) // Cambio gradual de velocidad
     const visibleNotes = notesRef.current.filter(note => {
       const noteScreenTime = note.time - currentTime
       return noteScreenTime <= effectiveSpeed && noteScreenTime >= -0.5 && !note.hit
@@ -1176,7 +1176,7 @@ function App() {
                 .filter(note => note.lane === laneIndex)
                 .map(note => {
                   const noteScreenTime = note.time - currentTime
-                  const effectiveSpeed = noteSpeed / speedMultiplier
+                  const effectiveSpeed = noteSpeed / (1 + (speedMultiplier - 1) * 0.5)
                   const progress = 1 - (noteScreenTime / effectiveSpeed)
                   const top = progress * 85
 

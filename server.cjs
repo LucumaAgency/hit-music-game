@@ -332,46 +332,47 @@ async function getYouTubeAudioUrl(videoId) {
   console.log(`[RapidAPI] Intentando obtener audio para: ${videoId}`)
 
   // Usar coolguruji-youtube-to-mp3-download API
-  const options = {
-    hostname: 'coolguruji-youtube-to-mp3-download-v1.p.rapidapi.com',
-    path: `/?id=${videoId}`,
-    method: 'GET',
-    headers: {
-      'X-RapidAPI-Key': RAPIDAPI_KEY,
-      'X-RapidAPI-Host': 'coolguruji-youtube-to-mp3-download-v1.p.rapidapi.com'
+  // Probar múltiples endpoints comunes
+  const endpoints = ['/dl', '/download', '/mp3', '/convert']
+
+  for (const endpoint of endpoints) {
+    const options = {
+      hostname: 'coolguruji-youtube-to-mp3-download-v1.p.rapidapi.com',
+      path: `${endpoint}?id=${videoId}`,
+      method: 'GET',
+      headers: {
+        'X-RapidAPI-Key': RAPIDAPI_KEY,
+        'X-RapidAPI-Host': 'coolguruji-youtube-to-mp3-download-v1.p.rapidapi.com'
+      }
+    }
+
+    console.log(`[RapidAPI] Probando endpoint: ${endpoint}`)
+
+    try {
+      const result = await httpsRequest(options)
+      console.log(`[RapidAPI] ${endpoint} -> Status:`, result.status)
+
+      if (result.status === 200) {
+        console.log('[RapidAPI] Respuesta:', JSON.stringify(result.data).substring(0, 500))
+
+        const response = result.data
+        if (response.error || response.status === 'fail') {
+          continue // Try next endpoint
+        }
+
+        const downloadUrl = response.link || response.url || response.download ||
+                            response.mp3 || response.audio || response.dlink
+
+        if (downloadUrl) {
+          return downloadUrl
+        }
+      }
+    } catch (e) {
+      console.log(`[RapidAPI] ${endpoint} falló:`, e.message)
     }
   }
 
-  try {
-    const result = await httpsRequest(options)
-    console.log('[RapidAPI] Status:', result.status)
-    console.log('[RapidAPI] Respuesta:', JSON.stringify(result.data).substring(0, 500))
-
-    if (result.status !== 200) {
-      throw new Error(`API respondió con status ${result.status}: ${JSON.stringify(result.data)}`)
-    }
-
-    const response = result.data
-
-    // Verificar si hay error
-    if (response.error || response.status === 'fail') {
-      throw new Error(response.error || response.msg || 'La API falló al procesar el video')
-    }
-
-    // Buscar URL de descarga en campos comunes
-    const downloadUrl = response.link || response.url || response.download ||
-                        response.mp3 || response.audio || response.dlink
-
-    if (!downloadUrl) {
-      console.error('[RapidAPI] Respuesta completa:', JSON.stringify(response))
-      throw new Error('No se encontró URL de descarga en la respuesta')
-    }
-
-    return downloadUrl
-  } catch (error) {
-    console.error('[RapidAPI] Error:', error.message)
-    throw error
-  }
+  throw new Error('No se pudo obtener URL de ningún endpoint')
 }
 
 // Endpoint para agregar canción de YouTube

@@ -800,7 +800,8 @@ function App() {
 
       if (gameState !== 'playing' || isPaused) return
 
-      const currentTime = audioRef.current?.currentTime || 0
+      // Usar getCurrentTime que maneja tanto YouTube como audio normal
+      const currentTime = getCurrentTime()
 
       const hitNote = notesRef.current.find(note =>
         note.lane === laneIndex &&
@@ -838,7 +839,7 @@ function App() {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('keyup', handleKeyUp)
     }
-  }, [gameState, combo, togglePause, isPaused])
+  }, [gameState, combo, togglePause, isPaused, getCurrentTime])
 
   // Tiempo actual para renderizar notas
   const currentTime = selectedSong?.type === 'youtube' && ytPlayerRef.current

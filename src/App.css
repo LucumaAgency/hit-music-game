@@ -1026,13 +1026,92 @@ body {
   border: 1px solid #333;
 }
 
+.editor-main {
+  display: flex;
+  flex: 1;
+  gap: 20px;
+  overflow: hidden;
+  padding: 15px 0;
+}
+
+/* Vista previa de carriles */
+.lane-preview {
+  width: 250px;
+  min-width: 250px;
+  display: flex;
+  flex-direction: column;
+  background: #0a0a15;
+  border-radius: 10px;
+  border: 1px solid #333;
+  overflow: hidden;
+}
+
+.lane-preview-header {
+  display: flex;
+  padding: 10px 0;
+  border-bottom: 2px solid #333;
+  background: #1a1a2e;
+}
+
+.lane-label {
+  flex: 1;
+  text-align: center;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.lane-preview-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.preview-lane {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 20%;
+}
+
+.preview-lane:nth-child(1) { left: 0; }
+.preview-lane:nth-child(2) { left: 20%; }
+.preview-lane:nth-child(3) { left: 40%; }
+.preview-lane:nth-child(4) { left: 60%; }
+.preview-lane:nth-child(5) { left: 80%; }
+
+.lane-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  border-left: 2px dashed;
+  opacity: 0.5;
+}
+
+.cursor-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 11%;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #22c55e, #22c55e, transparent);
+  box-shadow: 0 0 10px #22c55e;
+  z-index: 10;
+}
+
+.preview-note {
+  position: absolute;
+  width: 36px;
+  height: 14px;
+  border-radius: 4px;
+  transform: translateX(-50%);
+  z-index: 5;
+}
+
 .note-list-container {
   flex: 1;
   overflow-y: auto;
-  margin: 15px 0;
-  max-width: 500px;
-  width: 100%;
-  align-self: center;
 }
 
 .note-list {

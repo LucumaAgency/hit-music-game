@@ -14,6 +14,7 @@ function NoteEditor({ notes, song, audioRef, ytPlayerRef, onSave, onCancel }) {
   )
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
+  const [previewWindow, setPreviewWindow] = useState(4) // Segundos visibles en preview
   const animationRef = useRef(null)
 
   // Actualizar tiempo actual durante reproducción
@@ -47,7 +48,6 @@ function NoteEditor({ notes, song, audioRef, ytPlayerRef, onSave, onCancel }) {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current)
       }
-      // Pausar audio al salir
       if (song?.type === 'youtube' && ytPlayerRef?.current) {
         try { ytPlayerRef.current.pauseVideo() } catch (e) {}
       } else if (audioRef?.current) {
@@ -106,7 +106,6 @@ function NoteEditor({ notes, song, audioRef, ytPlayerRef, onSave, onCancel }) {
   }
 
   const handleSave = () => {
-    // Pausar antes de guardar
     if (isPlaying) {
       if (song?.type === 'youtube' && ytPlayerRef?.current) {
         ytPlayerRef.current.pauseVideo()
@@ -119,7 +118,6 @@ function NoteEditor({ notes, song, audioRef, ytPlayerRef, onSave, onCancel }) {
   }
 
   const handleCancel = () => {
-    // Pausar antes de cancelar
     if (isPlaying) {
       if (song?.type === 'youtube' && ytPlayerRef?.current) {
         ytPlayerRef.current.pauseVideo()
@@ -130,6 +128,12 @@ function NoteEditor({ notes, song, audioRef, ytPlayerRef, onSave, onCancel }) {
     }
     onCancel()
   }
+
+  // Notas visibles en el preview (alrededor del tiempo actual)
+  const visibleNotes = editedNotes.filter(note => {
+    const relativeTime = note.time - currentTime
+    return relativeTime >= -0.5 && relativeTime <= previewWindow
+  })
 
   return (
     <div className="note-editor">
@@ -148,62 +152,106 @@ function NoteEditor({ notes, song, audioRef, ytPlayerRef, onSave, onCancel }) {
         <span className="current-time">{formatTime(currentTime)}</span>
       </div>
 
-      <div className="note-list-container">
-        <table className="note-list">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Tiempo</th>
-              <th>Carril</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {editedNotes.map((note, index) => {
-              const isNear = Math.abs(note.time - currentTime) < 0.3
+      <div className="editor-main">
+        {/* Vista previa de carriles */}
+        <div className="lane-preview">
+          <div className="lane-preview-header">
+            {LANES.map((lane, i) => (
+              <div key={i} className="lane-label" style={{ color: lane.color }}>
+                {lane.key.toUpperCase()}
+              </div>
+            ))}
+          </div>
+          <div className="lane-preview-area">
+            {/* Carriles */}
+            {LANES.map((lane, i) => (
+              <div key={i} className="preview-lane">
+                <div className="lane-line" style={{ borderColor: lane.color + '33' }}></div>
+              </div>
+            ))}
+
+            {/* Línea del cursor (posición actual) */}
+            <div className="cursor-line"></div>
+
+            {/* Notas */}
+            {visibleNotes.map((note, idx) => {
+              const relativeTime = note.time - currentTime
+              const position = ((relativeTime + 0.5) / (previewWindow + 0.5)) * 100
+
               return (
-                <tr
-                  key={index}
-                  className={`note-row ${isNear ? 'note-current' : ''}`}
-                >
-                  <td>{index + 1}</td>
-                  <td className="note-time-cell">
-                    <button
-                      className="time-btn"
-                      onClick={() => adjustTime(index, -0.1)}
-                    >-</button>
-                    <span
-                      className="note-time clickable"
-                      onClick={() => seekTo(note.time)}
-                    >
-                      {formatTime(note.time)}
-                    </span>
-                    <button
-                      className="time-btn"
-                      onClick={() => adjustTime(index, 0.1)}
-                    >+</button>
-                  </td>
-                  <td>
-                    <span
-                      className="lane-indicator"
-                      style={{ backgroundColor: LANES[note.lane].color }}
-                    >
-                      {LANES[note.lane].key.toUpperCase()}
-                    </span>
-                  </td>
-                  <td>
-                    <button
-                      className="delete-btn"
-                      onClick={() => deleteNote(index)}
-                    >
-                      Eliminar
-                    </button>
-                  </td>
-                </tr>
+                <div
+                  key={idx}
+                  className="preview-note"
+                  style={{
+                    left: `${(note.lane / 5) * 100 + 10}%`,
+                    top: `${position}%`,
+                    backgroundColor: LANES[note.lane].color,
+                    boxShadow: `0 0 10px ${LANES[note.lane].color}`
+                  }}
+                />
               )
             })}
-          </tbody>
-        </table>
+          </div>
+        </div>
+
+        {/* Tabla de notas */}
+        <div className="note-list-container">
+          <table className="note-list">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Tiempo</th>
+                <th>Carril</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {editedNotes.map((note, index) => {
+                const isNear = Math.abs(note.time - currentTime) < 0.3
+                return (
+                  <tr
+                    key={index}
+                    className={`note-row ${isNear ? 'note-current' : ''}`}
+                  >
+                    <td>{index + 1}</td>
+                    <td className="note-time-cell">
+                      <button
+                        className="time-btn"
+                        onClick={() => adjustTime(index, -0.1)}
+                      >-</button>
+                      <span
+                        className="note-time clickable"
+                        onClick={() => seekTo(note.time)}
+                      >
+                        {formatTime(note.time)}
+                      </span>
+                      <button
+                        className="time-btn"
+                        onClick={() => adjustTime(index, 0.1)}
+                      >+</button>
+                    </td>
+                    <td>
+                      <span
+                        className="lane-indicator"
+                        style={{ backgroundColor: LANES[note.lane].color }}
+                      >
+                        {LANES[note.lane].key.toUpperCase()}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        className="delete-btn"
+                        onClick={() => deleteNote(index)}
+                      >
+                        Eliminar
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="editor-footer">

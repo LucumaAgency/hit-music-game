@@ -916,6 +916,14 @@ body {
   box-shadow: 0 0 30px rgba(239, 68, 68, 0.5) !important;
 }
 
+.edit-button {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed) !important;
+}
+
+.edit-button:hover {
+  box-shadow: 0 0 30px rgba(139, 92, 246, 0.5) !important;
+}
+
 .ready-buttons {
   display: flex;
   gap: 15px;
@@ -1036,8 +1044,8 @@ body {
 
 /* Vista previa de carriles */
 .lane-preview {
-  width: 250px;
-  min-width: 250px;
+  width: 350px;
+  min-width: 350px;
   display: flex;
   flex-direction: column;
   background: #0a0a15;
@@ -1102,9 +1110,9 @@ body {
 
 .preview-note {
   position: absolute;
-  width: 36px;
-  height: 14px;
-  border-radius: 4px;
+  width: 50px;
+  height: 18px;
+  border-radius: 5px;
   transform: translateX(-50%);
   z-index: 5;
 }

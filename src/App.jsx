@@ -1244,14 +1244,15 @@ function App() {
         </div>
       )}
 
-      {gameState === 'ready' && !isMultiplayer && (
+      {gameState === 'ready' && !isMultiplayer && !showEditor && (
         <div className="menu">
           <h2>Listo!</h2>
           <p className="song-info">{selectedSong?.title} - {selectedSong?.artist}</p>
           <p>{notes.length} notas {loadedFromJson ? 'cargadas' : 'generadas'} | {bpm} BPM</p>
           <div className="ready-buttons">
-            <button onClick={startGame}>▶ Jugar</button>
-            <button className="record-button" onClick={startRecording}>⏺ Grabar Notas</button>
+            <button onClick={startGame}>Jugar</button>
+            <button className="record-button" onClick={startRecording}>Grabar Notas</button>
+            <button className="edit-button" onClick={() => setShowEditor(true)}>Editar Notas</button>
           </div>
           <button className="back-button" onClick={backToMenu}>Volver</button>
         </div>
@@ -1274,12 +1275,17 @@ function App() {
 
       {showEditor && (
         <NoteEditor
-          notes={recordedNotes}
+          notes={gameState === 'recording-done' ? recordedNotes : notes}
           song={selectedSong}
           audioRef={audioRef}
           ytPlayerRef={ytPlayerRef}
           onSave={(editedNotes) => {
-            setRecordedNotes(editedNotes)
+            if (gameState === 'recording-done') {
+              setRecordedNotes(editedNotes)
+            } else {
+              setNotes(editedNotes)
+              notesRef.current = editedNotes.map((n, i) => ({ ...n, id: i, hit: false, missed: false }))
+            }
             setShowEditor(false)
           }}
           onCancel={() => setShowEditor(false)}

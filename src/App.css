@@ -983,6 +983,49 @@ body {
   margin: 0;
 }
 
+.editor-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  padding: 15px 0;
+  border-bottom: 1px solid #333;
+}
+
+.play-btn, .seek-btn {
+  padding: 10px 20px;
+  font-size: 1rem;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.play-btn:hover, .seek-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+}
+
+.seek-btn {
+  background: linear-gradient(135deg, #444, #333);
+}
+
+.seek-btn:hover {
+  box-shadow: 0 0 15px rgba(100, 100, 100, 0.4);
+}
+
+.current-time {
+  font-family: monospace;
+  font-size: 1.3rem;
+  color: #22c55e;
+  background: #1a1a2e;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid #333;
+}
+
 .note-list-container {
   flex: 1;
   overflow-y: auto;
@@ -1014,6 +1057,21 @@ body {
 
 .note-row:hover {
   background: rgba(34, 197, 94, 0.1);
+}
+
+.note-row.note-current {
+  background: rgba(234, 179, 8, 0.25);
+}
+
+.note-time.clickable {
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.note-time.clickable:hover {
+  background: rgba(34, 197, 94, 0.3);
 }
 
 .note-row td {

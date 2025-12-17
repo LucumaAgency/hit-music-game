@@ -1275,6 +1275,9 @@ function App() {
       {showEditor && (
         <NoteEditor
           notes={recordedNotes}
+          song={selectedSong}
+          audioRef={audioRef}
+          ytPlayerRef={ytPlayerRef}
           onSave={(editedNotes) => {
             setRecordedNotes(editedNotes)
             setShowEditor(false)

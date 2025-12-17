@@ -105,6 +105,15 @@ function NoteEditor({ notes, song, audioRef, ytPlayerRef, onSave, onCancel }) {
     setEditedNotes(newNotes)
   }
 
+  // Mover todas las notas por delta segundos
+  const shiftAllNotes = (delta) => {
+    const newNotes = editedNotes.map(note => ({
+      ...note,
+      time: Math.max(0, Math.round((note.time + delta) * 1000) / 1000)
+    }))
+    setEditedNotes(newNotes)
+  }
+
   const handleSave = () => {
     if (isPlaying) {
       if (song?.type === 'youtube' && ytPlayerRef?.current) {
@@ -150,6 +159,13 @@ function NoteEditor({ notes, song, audioRef, ytPlayerRef, onSave, onCancel }) {
           ⏮ Inicio
         </button>
         <span className="current-time">{formatTime(currentTime)}</span>
+        <div className="global-offset">
+          <span className="offset-label">Offset global:</span>
+          <button className="offset-btn" onClick={() => shiftAllNotes(-1)}>-1s</button>
+          <button className="offset-btn" onClick={() => shiftAllNotes(-0.1)}>-0.1s</button>
+          <button className="offset-btn" onClick={() => shiftAllNotes(0.1)}>+0.1s</button>
+          <button className="offset-btn" onClick={() => shiftAllNotes(1)}>+1s</button>
+        </div>
       </div>
 
       <div className="editor-main">

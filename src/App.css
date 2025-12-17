@@ -1034,6 +1034,38 @@ body {
   border: 1px solid #333;
 }
 
+.global-offset {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 20px;
+  padding-left: 20px;
+  border-left: 1px solid #444;
+}
+
+.offset-label {
+  color: #888;
+  font-size: 0.9rem;
+}
+
+.offset-btn {
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  background: linear-gradient(135deg, #1a1a2e, #2a2a4e);
+  color: #eab308;
+  border: 1px solid #eab308;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.offset-btn:hover {
+  background: linear-gradient(135deg, #eab308, #ca8a04);
+  color: #000;
+  box-shadow: 0 0 15px rgba(234, 179, 8, 0.4);
+}
+
 .editor-main {
   display: flex;
   flex: 1;

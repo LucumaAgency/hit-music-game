@@ -8,4 +8,7 @@ export default defineConfig({
     allowedHosts: true,
     host: true,
   },
+  build: {
+    assetsDir: 'static',  // Cambiar de 'assets' a 'static' para evitar intercepción de nginx
+  },
 })

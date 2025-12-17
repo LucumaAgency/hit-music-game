@@ -32,6 +32,25 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'))
 })
 
+// Ruta explícita para static assets (evita que Plesk/nginx intercepte)
+app.get('/static/:filename', (req, res) => {
+  const filename = req.params.filename
+  const filePath = path.join(__dirname, 'dist', 'static', filename)
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).send('Not found')
+  }
+
+  // Establecer MIME type correcto
+  if (filename.endsWith('.js')) {
+    res.type('application/javascript')
+  } else if (filename.endsWith('.css')) {
+    res.type('text/css')
+  }
+
+  res.sendFile(filePath)
+})
+
 // Servir archivos estáticos del build con MIME types correctos
 app.use(express.static(path.join(__dirname, 'dist'), {
   setHeaders: (res, filePath) => {

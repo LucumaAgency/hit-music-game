@@ -952,3 +952,48 @@ body {
     transparent
   );
 }
+
+/* Note Editor - Paso 1 */
+.note-editor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(10, 10, 20, 0.98);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 200;
+}
+
+.note-editor h2 {
+  color: #22c55e;
+  margin-bottom: 20px;
+}
+
+.note-editor p {
+  color: #aaa;
+  margin-bottom: 20px;
+}
+
+.editor-footer {
+  display: flex;
+  gap: 15px;
+}
+
+.editor-footer button {
+  padding: 12px 30px;
+  font-size: 1rem;
+  background: linear-gradient(135deg, #444, #333);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.editor-footer button:hover {
+  background: linear-gradient(135deg, #555, #444);
+}

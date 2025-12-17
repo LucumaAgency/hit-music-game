@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { io } from 'socket.io-client'
 import './App.css'
+import NoteEditor from './NoteEditor'
 
 const LANES = [
   { key: 'a', color: '#22c55e' },
@@ -223,6 +224,9 @@ function App() {
   const [isRecording, setIsRecording] = useState(false)
   const [recordedNotes, setRecordedNotes] = useState([])
   const recordedNotesRef = useRef([])
+
+  // Editor state
+  const [showEditor, setShowEditor] = useState(false)
 
   const audioRef = useRef(null)
   const audioContextRef = useRef(null)
@@ -1254,17 +1258,26 @@ function App() {
       )}
 
       {/* Pantalla de resultado de grabación */}
-      {gameState === 'recording-done' && (
+      {gameState === 'recording-done' && !showEditor && (
         <div className="menu">
-          <h2>⏺ Grabación Terminada</h2>
+          <h2>Grabacion Terminada</h2>
           <p className="song-info">{selectedSong?.title} - {selectedSong?.artist}</p>
           <p className="recording-count">{recordedNotes.length} notas grabadas</p>
           <div className="ready-buttons">
-            <button onClick={saveRecordedNotes}>💾 Guardar Notas</button>
-            <button onClick={startRecording}>🔄 Grabar de Nuevo</button>
+            <button onClick={saveRecordedNotes}>Guardar Notas</button>
+            <button onClick={() => setShowEditor(true)}>Editar Notas</button>
+            <button onClick={startRecording}>Grabar de Nuevo</button>
           </div>
           <button className="back-button" onClick={backToMenu}>Descartar y Volver</button>
         </div>
+      )}
+
+      {showEditor && (
+        <NoteEditor
+          notes={recordedNotes}
+          onSave={() => setShowEditor(false)}
+          onCancel={() => setShowEditor(false)}
+        />
       )}
 
       {gameState === 'paused' && (

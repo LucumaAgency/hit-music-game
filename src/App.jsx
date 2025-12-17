@@ -1275,7 +1275,10 @@ function App() {
       {showEditor && (
         <NoteEditor
           notes={recordedNotes}
-          onSave={() => setShowEditor(false)}
+          onSave={(editedNotes) => {
+            setRecordedNotes(editedNotes)
+            setShowEditor(false)
+          }}
           onCancel={() => setShowEditor(false)}
         />
       )}

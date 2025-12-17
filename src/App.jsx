@@ -219,6 +219,11 @@ function App() {
   const [uploadLoading, setUploadLoading] = useState(false)
   const [uploadError, setUploadError] = useState('')
 
+  // Recording mode states
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordedNotes, setRecordedNotes] = useState([])
+  const recordedNotesRef = useRef([])
+
   const audioRef = useRef(null)
   const audioContextRef = useRef(null)
   const animationRef = useRef(null)
@@ -590,7 +595,98 @@ function App() {
     }
 
     setIsPaused(false)
+    setIsRecording(false)
     setGameState('playing')
+  }
+
+  // Iniciar modo grabación
+  const startRecording = () => {
+    if (gameState !== 'ready' && gameState !== 'finished') return
+
+    // Limpiar notas grabadas anteriores
+    setRecordedNotes([])
+    recordedNotesRef.current = []
+    setActiveNotes([])
+    setFeedback({})
+
+    // Iniciar audio
+    if (selectedSong?.type === 'youtube' && ytPlayerRef.current) {
+      ytPlayerRef.current.seekTo(0)
+      ytPlayerRef.current.setVolume(volume * 100)
+      ytPlayerRef.current.playVideo()
+    } else if (audioRef.current) {
+      audioRef.current.currentTime = 0
+      audioRef.current.volume = volume
+      audioRef.current.play()
+    }
+
+    setIsPaused(false)
+    setIsRecording(true)
+    setGameState('playing')
+  }
+
+  // Detener grabación y mostrar resultado
+  const stopRecording = () => {
+    if (selectedSong?.type === 'youtube' && ytPlayerRef.current) {
+      ytPlayerRef.current.pauseVideo()
+    } else if (audioRef.current) {
+      audioRef.current.pause()
+    }
+
+    setRecordedNotes([...recordedNotesRef.current])
+    setIsRecording(false)
+    setGameState('recording-done')
+  }
+
+  // Guardar notas grabadas en el servidor
+  const saveRecordedNotes = async () => {
+    if (recordedNotes.length === 0) {
+      alert('No hay notas grabadas')
+      return
+    }
+
+    try {
+      const notesData = {
+        song: {
+          title: selectedSong.title,
+          artist: selectedSong.artist,
+          bpm: bpm
+        },
+        notes: recordedNotes.sort((a, b) => a.time - b.time),
+        bpm: bpm
+      }
+
+      // Guardar via API
+      const response = await fetch('/api/save-notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          songId: selectedSong.id,
+          notesData
+        })
+      })
+
+      if (response.ok) {
+        alert(`¡${recordedNotes.length} notas guardadas!`)
+        // Actualizar las notas de la canción actual
+        setNotes(recordedNotes)
+        notesRef.current = recordedNotes.map((n, i) => ({ ...n, id: i, hit: false, missed: false }))
+        setLoadedFromJson(true)
+        setGameState('ready')
+      } else {
+        throw new Error('Error guardando notas')
+      }
+    } catch (error) {
+      console.error('Error:', error)
+      alert('Error guardando notas. Descargando JSON...')
+      // Fallback: descargar JSON
+      const notesData = {
+        song: { title: selectedSong.title, artist: selectedSong.artist, bpm },
+        notes: recordedNotes.sort((a, b) => a.time - b.time),
+        bpm
+      }
+      downloadJSON(notesData, `${selectedSong.id || 'recorded'}-notes.json`)
+    }
   }
 
   const togglePause = useCallback(() => {
@@ -803,7 +899,11 @@ function App() {
       }
 
       if (key === 'escape') {
-        backToMenu()
+        if (isRecording) {
+          stopRecording()
+        } else {
+          backToMenu()
+        }
         return
       }
 
@@ -819,6 +919,18 @@ function App() {
       // Usar getCurrentTime que maneja tanto YouTube como audio normal
       const currentTime = getCurrentTime()
 
+      // Modo grabación: registrar la nota
+      if (isRecording) {
+        const newNote = {
+          time: Math.round(currentTime * 1000) / 1000, // Redondear a 3 decimales
+          lane: laneIndex
+        }
+        recordedNotesRef.current.push(newNote)
+        setFeedback(prev => ({ ...prev, [laneIndex]: { type: 'hit', time: Date.now() } }))
+        return
+      }
+
+      // Modo normal: verificar hits
       const hitNote = notesRef.current.find(note =>
         note.lane === laneIndex &&
         !note.hit &&
@@ -855,7 +967,7 @@ function App() {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('keyup', handleKeyUp)
     }
-  }, [gameState, combo, togglePause, isPaused, getCurrentTime])
+  }, [gameState, combo, togglePause, isPaused, getCurrentTime, isRecording])
 
   // Tiempo actual para renderizar notas
   const currentTime = selectedSong?.type === 'youtube' && ytPlayerRef.current
@@ -1133,13 +1245,25 @@ function App() {
           <h2>Listo!</h2>
           <p className="song-info">{selectedSong?.title} - {selectedSong?.artist}</p>
           <p>{notes.length} notas {loadedFromJson ? 'cargadas' : 'generadas'} | {bpm} BPM</p>
-          {!loadedFromJson && (
-            <p className="json-hint">
-              JSON descargado! Muevelo a public/songs/ para guardarlo
-            </p>
-          )}
-          <button onClick={startGame}>Jugar!</button>
+          <div className="ready-buttons">
+            <button onClick={startGame}>▶ Jugar</button>
+            <button className="record-button" onClick={startRecording}>⏺ Grabar Notas</button>
+          </div>
           <button className="back-button" onClick={backToMenu}>Volver</button>
+        </div>
+      )}
+
+      {/* Pantalla de resultado de grabación */}
+      {gameState === 'recording-done' && (
+        <div className="menu">
+          <h2>⏺ Grabación Terminada</h2>
+          <p className="song-info">{selectedSong?.title} - {selectedSong?.artist}</p>
+          <p className="recording-count">{recordedNotes.length} notas grabadas</p>
+          <div className="ready-buttons">
+            <button onClick={saveRecordedNotes}>💾 Guardar Notas</button>
+            <button onClick={startRecording}>🔄 Grabar de Nuevo</button>
+          </div>
+          <button className="back-button" onClick={backToMenu}>Descartar y Volver</button>
         </div>
       )}
 
@@ -1222,7 +1346,17 @@ function App() {
       {(gameState === 'playing' || gameState === 'finished' || gameState === 'paused') && (
         <div className="game-area">
           {/* Combo grande estilo DDR */}
-          {combo > 0 && gameState === 'playing' && (
+          {/* Indicador de grabación */}
+          {isRecording && gameState === 'playing' && (
+            <div className="recording-indicator">
+              <span className="rec-dot">⏺</span>
+              <span className="rec-text">GRABANDO</span>
+              <span className="rec-count">{recordedNotesRef.current.length} notas</span>
+              <span className="rec-hint">ESC para terminar</span>
+            </div>
+          )}
+          {/* Combo display (solo en modo normal) */}
+          {combo > 0 && gameState === 'playing' && !isRecording && (
             <div className="combo-display">
               <span className="combo-number">{combo}</span>
               <span className="combo-label">COMBO</span>

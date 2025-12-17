@@ -331,6 +331,39 @@ app.post('/api/upload', (req, res) => {
   })
 })
 
+// Endpoint para guardar notas grabadas
+app.post('/api/save-notes', (req, res) => {
+  try {
+    const { songId, notesData } = req.body
+
+    if (!songId || !notesData) {
+      return res.status(400).json({ error: 'Faltan datos requeridos' })
+    }
+
+    const notesFilename = `${songId}.json`
+    const notesPath = path.join(UPLOADS_DIR, notesFilename)
+
+    // Verificar que el archivo existe
+    if (!fs.existsSync(notesPath)) {
+      return res.status(404).json({ error: 'Canción no encontrada' })
+    }
+
+    // Guardar las notas
+    fs.writeFileSync(notesPath, JSON.stringify(notesData, null, 2))
+
+    console.log(`[SaveNotes] Guardadas ${notesData.notes?.length || 0} notas para ${songId}`)
+
+    res.json({
+      success: true,
+      message: 'Notas guardadas correctamente',
+      notesCount: notesData.notes?.length || 0
+    })
+  } catch (error) {
+    console.error('Error guardando notas:', error)
+    res.status(500).json({ error: 'Error al guardar las notas: ' + error.message })
+  }
+})
+
 // Endpoint para obtener lista de canciones
 app.get('/api/songs', (req, res) => {
   let allSongs = []

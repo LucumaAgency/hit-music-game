@@ -1,6 +1,9 @@
 # Audio files
 *.mp3
 
+# Dev index.html (production uses dist/index.html)
+index.html
+
 # Logs
 logs
 *.log

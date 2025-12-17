@@ -953,7 +953,7 @@ body {
   );
 }
 
-/* Note Editor - Paso 1 */
+/* Note Editor */
 .note-editor {
   position: fixed;
   top: 0;
@@ -963,25 +963,86 @@ body {
   background: rgba(10, 10, 20, 0.98);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
   padding: 20px;
   z-index: 200;
 }
 
-.note-editor h2 {
-  color: #22c55e;
-  margin-bottom: 20px;
+.note-editor-header {
+  text-align: center;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #333;
 }
 
-.note-editor p {
-  color: #aaa;
-  margin-bottom: 20px;
+.note-editor-header h2 {
+  color: #22c55e;
+  margin-bottom: 5px;
+}
+
+.note-editor-header p {
+  color: #888;
+  margin: 0;
+}
+
+.note-list-container {
+  flex: 1;
+  overflow-y: auto;
+  margin: 15px 0;
+  max-width: 500px;
+  width: 100%;
+  align-self: center;
+}
+
+.note-list {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.note-list th {
+  padding: 10px;
+  background: #1a1a2e;
+  color: #888;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  border-bottom: 2px solid #333;
+  position: sticky;
+  top: 0;
+}
+
+.note-row {
+  transition: background 0.2s;
+}
+
+.note-row:hover {
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.note-row td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #222;
+  text-align: center;
+  color: #ccc;
+}
+
+.note-time {
+  font-family: monospace;
+  font-size: 0.95rem;
+}
+
+.lane-indicator {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 0.9rem;
+  color: white;
 }
 
 .editor-footer {
   display: flex;
   gap: 15px;
+  justify-content: center;
+  padding-top: 15px;
+  border-top: 1px solid #333;
 }
 
 .editor-footer button {

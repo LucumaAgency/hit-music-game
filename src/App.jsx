@@ -190,6 +190,7 @@ function App() {
 
   // Multiplayer states
   const [isMultiplayer, setIsMultiplayer] = useState(false)
+  const [showMultiplayerMenu, setShowMultiplayerMenu] = useState(false)
   const [playerName, setPlayerName] = useState('')
   const [roomCode, setRoomCode] = useState('')
   const [roomInput, setRoomInput] = useState('')
@@ -666,6 +667,7 @@ function App() {
       socketRef.current = null
     }
     setIsMultiplayer(false)
+    setShowMultiplayerMenu(false)
     setRoomCode('')
     setOpponent(null)
     setOpponentScore(0)
@@ -922,76 +924,95 @@ function App() {
         </div>
       </div>
 
-      {gameState === 'idle' && !selectedSong && !isMultiplayer && (
-        <div className="menu">
-          <h2>Selecciona una Cancion</h2>
-          <div className="song-list">
-            {songs.map(song => (
+      {gameState === 'idle' && !selectedSong && !isMultiplayer && !showMultiplayerMenu && (
+        <div className="menu menu-wide">
+          <div className="menu-layout">
+            {/* Columna izquierda - Lista de canciones */}
+            <div className="menu-column">
+              <h2>Canciones</h2>
+              <div className="song-list">
+                {songs.map(song => (
+                  <button
+                    key={song.id}
+                    className={`song-button ${song.type === 'youtube' ? 'youtube-song' : ''}`}
+                    onClick={() => loadSong(song)}
+                  >
+                    <span className="song-title">
+                      {song.type === 'youtube' && <span className="yt-badge">YT</span>}
+                      {song.title}
+                    </span>
+                    <span className="song-artist">{song.artist}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Columna derecha - Upload y opciones */}
+            <div className="menu-column">
+              <h2>Subir Canción</h2>
+              <div className="upload-section">
+                <input
+                  type="text"
+                  placeholder="Título (opcional)"
+                  value={uploadTitle}
+                  onChange={(e) => setUploadTitle(e.target.value)}
+                  className="upload-input"
+                  disabled={uploadLoading}
+                />
+                <input
+                  type="text"
+                  placeholder="Artista (opcional)"
+                  value={uploadArtist}
+                  onChange={(e) => setUploadArtist(e.target.value)}
+                  className="upload-input"
+                  disabled={uploadLoading}
+                />
+                <input
+                  type="text"
+                  placeholder="URL de YouTube para embed (opcional)"
+                  value={uploadYoutubeUrl}
+                  onChange={(e) => setUploadYoutubeUrl(e.target.value)}
+                  className="upload-input youtube-url"
+                  disabled={uploadLoading}
+                />
+                <p className="upload-hint">Si agregas YouTube URL, el video se usará para reproducir</p>
+
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept=".mp3,audio/mpeg"
+                  onChange={handleFileUpload}
+                  style={{ display: 'none' }}
+                />
+                <button
+                  className="upload-button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadLoading}
+                >
+                  {uploadLoading ? 'Subiendo...' : 'Seleccionar MP3 y Subir'}
+                </button>
+                {uploadError && <p className="error-msg">{uploadError}</p>}
+              </div>
+
+              <div className="menu-divider"></div>
+
               <button
-                key={song.id}
-                className={`song-button ${song.type === 'youtube' ? 'youtube-song' : ''}`}
-                onClick={() => loadSong(song)}
+                className="multiplayer-menu-btn"
+                onClick={() => setShowMultiplayerMenu(true)}
               >
-                <span className="song-title">
-                  {song.type === 'youtube' && <span className="yt-badge">YT</span>}
-                  {song.title}
-                </span>
-                <span className="song-artist">{song.artist}</span>
+                🎮 Multijugador
               </button>
-            ))}
-          </div>
 
-          <div className="upload-divider">
-            <span>o sube tu propio MP3</span>
+              <p className="instructions">Teclas: A S J K L</p>
+            </div>
           </div>
+        </div>
+      )}
 
-          <div className="upload-section">
-            <input
-              type="text"
-              placeholder="Título (opcional)"
-              value={uploadTitle}
-              onChange={(e) => setUploadTitle(e.target.value)}
-              className="upload-input"
-              disabled={uploadLoading}
-            />
-            <input
-              type="text"
-              placeholder="Artista (opcional)"
-              value={uploadArtist}
-              onChange={(e) => setUploadArtist(e.target.value)}
-              className="upload-input"
-              disabled={uploadLoading}
-            />
-            <input
-              type="text"
-              placeholder="URL de YouTube para embed (opcional)"
-              value={uploadYoutubeUrl}
-              onChange={(e) => setUploadYoutubeUrl(e.target.value)}
-              className="upload-input youtube-url"
-              disabled={uploadLoading}
-            />
-            <p className="upload-hint">Si agregas YouTube URL, el video se usará para reproducir la música</p>
-
-            <input
-              type="file"
-              ref={fileInputRef}
-              accept=".mp3,audio/mpeg"
-              onChange={handleFileUpload}
-              style={{ display: 'none' }}
-            />
-            <button
-              className="upload-button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadLoading}
-            >
-              {uploadLoading ? 'Subiendo...' : 'Seleccionar MP3 y Subir'}
-            </button>
-            {uploadError && <p className="error-msg">{uploadError}</p>}
-          </div>
-
-          <div className="upload-divider">
-            <span>Multiplayer</span>
-          </div>
+      {/* Submenú Multiplayer */}
+      {showMultiplayerMenu && !isMultiplayer && (
+        <div className="menu">
+          <h2>🎮 Multijugador</h2>
 
           <div className="multiplayer-section">
             <input
@@ -1001,28 +1022,35 @@ function App() {
               onChange={(e) => setPlayerName(e.target.value)}
               className="multiplayer-input"
             />
-            <div className="multiplayer-buttons">
-              <button className="multiplayer-btn create" onClick={createRoom}>
-                Crear Sala
-              </button>
-              <div className="join-section">
-                <input
-                  type="text"
-                  placeholder="Código"
-                  value={roomInput}
-                  onChange={(e) => setRoomInput(e.target.value.toUpperCase())}
-                  className="room-code-input"
-                  maxLength={6}
-                />
-                <button className="multiplayer-btn join" onClick={joinRoom}>
-                  Unirse
-                </button>
-              </div>
+
+            <button className="multiplayer-btn create" onClick={createRoom}>
+              Crear Sala
+            </button>
+
+            <div className="join-divider">
+              <span>o únete a una sala</span>
             </div>
+
+            <div className="join-section">
+              <input
+                type="text"
+                placeholder="Código de sala"
+                value={roomInput}
+                onChange={(e) => setRoomInput(e.target.value.toUpperCase())}
+                className="room-code-input"
+                maxLength={6}
+              />
+              <button className="multiplayer-btn join" onClick={joinRoom}>
+                Unirse
+              </button>
+            </div>
+
             {multiplayerError && <p className="error-msg">{multiplayerError}</p>}
           </div>
 
-          <p className="instructions">Teclas: A S J K L</p>
+          <button className="back-button" onClick={() => setShowMultiplayerMenu(false)}>
+            Volver
+          </button>
         </div>
       )}
 

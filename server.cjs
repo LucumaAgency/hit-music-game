@@ -32,16 +32,29 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'))
 })
 
-// Servir assets desde /api/app/ (nginx pasa /api/* a Node.js)
-app.use('/api/app', express.static(path.join(__dirname, 'dist'), {
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.js')) {
-      res.setHeader('Content-Type', 'application/javascript')
-    } else if (filePath.endsWith('.css')) {
-      res.setHeader('Content-Type', 'text/css')
-    }
+// Endpoint explícito para JS (forzar MIME type)
+app.get('/api/app/assets/:filename', (req, res) => {
+  const filename = req.params.filename
+  const filePath = path.join(__dirname, 'dist', 'assets', filename)
+
+  if (!fs.existsSync(filePath)) {
+    console.log('File not found:', filePath)
+    return res.status(404).send('Not found: ' + filename)
   }
-}))
+
+  const content = fs.readFileSync(filePath)
+
+  if (filename.endsWith('.js')) {
+    res.set('Content-Type', 'application/javascript; charset=utf-8')
+  } else if (filename.endsWith('.css')) {
+    res.set('Content-Type', 'text/css; charset=utf-8')
+  }
+
+  res.send(content)
+})
+
+// Servir otros assets desde /api/app/
+app.use('/api/app', express.static(path.join(__dirname, 'dist')))
 
 // Servir archivos estáticos del build con MIME types correctos
 app.use(express.static(path.join(__dirname, 'dist'), {

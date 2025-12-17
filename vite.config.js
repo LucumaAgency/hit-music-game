@@ -8,7 +8,8 @@ export default defineConfig({
     allowedHosts: true,
     host: true,
   },
+  base: '/api/app/',  // Usar ruta /api/ que nginx pasa a Node.js
   build: {
-    assetsDir: 'static',  // Cambiar de 'assets' a 'static' para evitar intercepción de nginx
+    assetsDir: 'assets',
   },
 })

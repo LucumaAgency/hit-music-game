@@ -27,29 +27,21 @@ const rooms = new Map()
 app.use(cors())
 app.use(express.json())
 
-// Servir index.html del dist PRIMERO para la raíz
+// Servir index.html del dist para la raíz
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'))
 })
 
-// Ruta explícita para static assets (evita que Plesk/nginx intercepte)
-app.get('/static/:filename', (req, res) => {
-  const filename = req.params.filename
-  const filePath = path.join(__dirname, 'dist', 'static', filename)
-
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).send('Not found')
+// Servir assets desde /api/app/ (nginx pasa /api/* a Node.js)
+app.use('/api/app', express.static(path.join(__dirname, 'dist'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript')
+    } else if (filePath.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css')
+    }
   }
-
-  // Establecer MIME type correcto
-  if (filename.endsWith('.js')) {
-    res.type('application/javascript')
-  } else if (filename.endsWith('.css')) {
-    res.type('text/css')
-  }
-
-  res.sendFile(filePath)
-})
+}))
 
 // Servir archivos estáticos del build con MIME types correctos
 app.use(express.static(path.join(__dirname, 'dist'), {

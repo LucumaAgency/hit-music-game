@@ -480,7 +480,7 @@ function App() {
     if (song.type === 'youtube' && song.videoId) {
       try {
         const notesPath = song.notes
-        const jsonResponse = await fetch(notesPath)
+        const jsonResponse = await fetch(`${notesPath}?t=${Date.now()}`)
 
         if (!jsonResponse.ok) {
           throw new Error('No se encontraron las notas')
@@ -519,9 +519,9 @@ function App() {
       audioRef.current.src = audioPath
     }
 
-    // Intentar cargar notas del JSON
+    // Intentar cargar notas del JSON (con cache-busting)
     try {
-      const jsonResponse = await fetch(notesPath)
+      const jsonResponse = await fetch(`${notesPath}?t=${Date.now()}`)
       if (jsonResponse.ok) {
         const songData = await jsonResponse.json()
         const loadedNotes = songData.notes || songData

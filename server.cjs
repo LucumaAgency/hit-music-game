@@ -65,12 +65,24 @@ app.use(express.static(path.join(__dirname, 'dist'), {
       res.setHeader('Content-Type', 'text/css')
     } else if (filePath.endsWith('.json')) {
       res.setHeader('Content-Type', 'application/json')
+      // Evitar caché para archivos JSON de canciones
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
+      res.setHeader('Pragma', 'no-cache')
+      res.setHeader('Expires', '0')
     }
   }
 }))
 
-// Servir archivos de uploads
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
+// Servir archivos de uploads (sin caché para JSON)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.json')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
+      res.setHeader('Pragma', 'no-cache')
+      res.setHeader('Expires', '0')
+    }
+  }
+}))
 
 // Endpoint de prueba
 app.get('/api/test', (req, res) => {

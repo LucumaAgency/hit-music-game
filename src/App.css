@@ -297,17 +297,30 @@ body {
   padding: 30px 40px;
   max-width: 900px;
   width: 90%;
+  max-height: 80vh;
 }
 
 .menu-layout {
   display: flex;
   gap: 40px;
   text-align: left;
+  height: 100%;
 }
 
 .menu-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-column:first-child {
+  min-width: 280px;
+  max-width: 320px;
+}
+
+.menu-column:last-child {
   flex: 1;
-  min-width: 300px;
+  justify-content: center;
+  align-items: center;
 }
 
 .menu-column h2 {
@@ -387,8 +400,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin: 20px 0;
-  max-height: 300px;
+  margin: 10px 0;
+  flex: 1;
   overflow-y: auto;
 }
 
@@ -461,6 +474,7 @@ body {
   flex-direction: column;
   gap: 10px;
   width: 100%;
+  max-width: 350px;
 }
 
 .upload-input {

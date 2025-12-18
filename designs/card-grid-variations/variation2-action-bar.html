@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Card Grid Variation 2: Action Bar Top</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #0f0f0f;
+      color: white;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* Fixed Action Bar */
+    .action-bar {
+      position: sticky;
+      top: 0;
+      background: rgba(15, 15, 15, 0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid #222;
+      padding: 20px 40px;
+      z-index: 100;
+    }
+
+    .bar-content {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 30px;
+    }
+
+    .logo {
+      font-size: 1.5rem;
+      font-weight: bold;
+      background: linear-gradient(90deg, #22c55e, #3b82f6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      white-space: nowrap;
+    }
+
+    .upload-mini {
+      display: flex;
+      gap: 10px;
+      flex: 1;
+      max-width: 500px;
+    }
+
+    .mini-input {
+      flex: 1;
+      padding: 10px 15px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: white;
+      font-size: 0.9rem;
+    }
+
+    .mini-input:focus {
+      outline: none;
+      border-color: #22c55e;
+    }
+
+    .mini-btn {
+      padding: 10px 20px;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.3s;
+    }
+
+    .mini-btn:hover {
+      transform: scale(1.02);
+    }
+
+    .mini-btn.purple {
+      background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    }
+
+    .keys-mini {
+      display: flex;
+      gap: 5px;
+      margin-left: auto;
+    }
+
+    .key-mini {
+      width: 35px;
+      height: 35px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 0.9rem;
+      background: #1a1a1a;
+    }
+
+    .key-mini:nth-child(1) { color: #22c55e; }
+    .key-mini:nth-child(2) { color: #ef4444; }
+    .key-mini:nth-child(3) { color: #eab308; }
+    .key-mini:nth-child(4) { color: #3b82f6; }
+    .key-mini:nth-child(5) { color: #f97316; }
+
+    /* Main Content */
+    .main {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 40px;
+    }
+
+    .page-title {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+    }
+
+    .page-subtitle {
+      color: #666;
+      margin-bottom: 40px;
+    }
+
+    /* Filter Bar */
+    .filter-bar {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      padding: 10px 20px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 20px;
+      color: #888;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .filter-btn:hover, .filter-btn.active {
+      background: #22c55e;
+      border-color: #22c55e;
+      color: white;
+    }
+
+    /* Songs Grid - Compact cards */
+    .songs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 15px;
+    }
+
+    .song-card {
+      background: #1a1a1a;
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.3s;
+      border: 1px solid transparent;
+    }
+
+    .song-card:hover {
+      transform: scale(1.03);
+      border-color: #22c55e;
+    }
+
+    .song-card.youtube:hover {
+      border-color: #ef4444;
+    }
+
+    .card-image {
+      height: 100px;
+      background: linear-gradient(135deg, #252525, #1a1a1a);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      position: relative;
+    }
+
+    .card-image.youtube {
+      background: linear-gradient(135deg, #ef4444, #b91c1c);
+    }
+
+    .badge {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      background: rgba(0,0,0,0.7);
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      font-weight: bold;
+    }
+
+    .card-info {
+      padding: 15px;
+    }
+
+    .song-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .song-artist {
+      font-size: 0.8rem;
+      color: #666;
+      margin-bottom: 10px;
+    }
+
+    .card-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: #555;
+    }
+
+    .stars {
+      color: #eab308;
+    }
+  </style>
+</head>
+<body>
+  <div class="action-bar">
+    <div class="bar-content">
+      <div class="logo">Guitar Flash</div>
+
+      <div class="upload-mini">
+        <input type="text" placeholder="Titulo - Artista" class="mini-input">
+        <button class="mini-btn">Subir MP3</button>
+      </div>
+
+      <button class="mini-btn purple">Multijugador</button>
+
+      <div class="keys-mini">
+        <div class="key-mini">A</div>
+        <div class="key-mini">S</div>
+        <div class="key-mini">J</div>
+        <div class="key-mini">K</div>
+        <div class="key-mini">L</div>
+      </div>
+    </div>
+  </div>
+
+  <main class="main">
+    <h1 class="page-title">Biblioteca</h1>
+    <p class="page-subtitle">Selecciona una cancion para comenzar</p>
+
+    <div class="filter-bar">
+      <button class="filter-btn active">Todas</button>
+      <button class="filter-btn">YouTube</button>
+      <button class="filter-btn">MP3</button>
+      <button class="filter-btn">Facil</button>
+      <button class="filter-btn">Medio</button>
+      <button class="filter-btn">Dificil</button>
+    </div>
+
+    <div class="songs-grid">
+      <div class="song-card youtube">
+        <div class="card-image youtube">
+          <span class="badge">YT</span>
+          ▶
+        </div>
+        <div class="card-info">
+          <div class="song-title">Through The Fire And Flames</div>
+          <div class="song-artist">DragonForce</div>
+          <div class="card-meta">
+            <span>7:21</span>
+            <span class="stars">★★★★★</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="song-card">
+        <div class="card-image">🎸</div>
+        <div class="card-info">
+          <div class="song-title">Cliffs of Dover</div>
+          <div class="song-artist">Eric Johnson</div>
+          <div class="card-meta">
+            <span>4:52</span>
+            <span class="stars">★★★★☆</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="song-card">
+        <div class="card-image">🎸</div>
+        <div class="card-info">
+          <div class="song-title">Free Bird</div>
+          <div class="song-artist">Lynyrd Skynyrd</div>
+          <div class="card-meta">
+            <span>9:08</span>
+            <span class="stars">★★★★☆</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="song-card">
+        <div class="card-image">🎸</div>
+        <div class="card-info">
+          <div class="song-title">Knights of Cydonia</div>
+          <div class="song-artist">Muse</div>
+          <div class="card-meta">
+            <span>6:06</span>
+            <span class="stars">★★★☆☆</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="song-card">
+        <div class="card-image">🎸</div>
+        <div class="card-info">
+          <div class="song-title">Eruption</div>
+          <div class="song-artist">Van Halen</div>
+          <div class="card-meta">
+            <span>1:42</span>
+            <span class="stars">★★★★★</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="song-card youtube">
+        <div class="card-image youtube">
+          <span class="badge">YT</span>
+          ▶
+        </div>
+        <div class="card-info">
+          <div class="song-title">Raining Blood</div>
+          <div class="song-artist">Slayer</div>
+          <div class="card-meta">
+            <span>4:17</span>
+            <span class="stars">★★★★★</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="song-card">
+        <div class="card-image">🎸</div>
+        <div class="card-info">
+          <div class="song-title">Bohemian Rhapsody</div>
+          <div class="song-artist">Queen</div>
+          <div class="card-meta">
+            <span>5:55</span>
+            <span class="stars">★★★★☆</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="song-card">
+        <div class="card-image">🎸</div>
+        <div class="card-info">
+          <div class="song-title">Stairway to Heaven</div>
+          <div class="song-artist">Led Zeppelin</div>
+          <div class="card-meta">
+            <span>8:02</span>
+            <span class="stars">★★★★☆</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

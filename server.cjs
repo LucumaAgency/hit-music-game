@@ -365,17 +365,90 @@ app.post('/api/save-notes', (req, res) => {
     }
 
     const notesFilename = `${songId}.json`
-    const notesPath = path.join(UPLOADS_DIR, notesFilename)
 
-    // Verificar que el archivo existe
-    if (!fs.existsSync(notesPath)) {
-      return res.status(404).json({ error: 'Canción no encontrada' })
+    // Buscar en uploads primero, luego en dist/songs
+    const uploadsNotesPath = path.join(UPLOADS_DIR, notesFilename)
+    const distNotesPath = path.join(__dirname, 'dist', 'songs', notesFilename)
+
+    // Determinar dónde guardar
+    let savePath = uploadsNotesPath
+    let isDistSong = false
+
+    if (fs.existsSync(uploadsNotesPath)) {
+      // Ya existe en uploads, sobrescribir ahí
+      savePath = uploadsNotesPath
+    } else if (fs.existsSync(distNotesPath)) {
+      // Es una canción de dist, guardar en uploads y actualizar index
+      isDistSong = true
+      savePath = uploadsNotesPath
+    } else {
+      // No existe en ningún lado, crear en uploads
+      savePath = uploadsNotesPath
+    }
+
+    // Asegurar que el directorio existe
+    if (!fs.existsSync(UPLOADS_DIR)) {
+      fs.mkdirSync(UPLOADS_DIR, { recursive: true })
     }
 
     // Guardar las notas
-    fs.writeFileSync(notesPath, JSON.stringify(notesData, null, 2))
+    fs.writeFileSync(savePath, JSON.stringify(notesData, null, 2))
 
-    console.log(`[SaveNotes] Guardadas ${notesData.notes?.length || 0} notas para ${songId}`)
+    console.log(`[SaveNotes] Guardadas ${notesData.notes?.length || 0} notas para ${songId} en ${savePath}`)
+
+    // Si era una canción de dist, agregar/actualizar en el index de uploads
+    if (isDistSong) {
+      const indexPath = path.join(UPLOADS_DIR, 'index.json')
+      let indexData = { songs: [] }
+
+      if (fs.existsSync(indexPath)) {
+        try {
+          const indexContent = fs.readFileSync(indexPath, 'utf8')
+          const parsed = JSON.parse(indexContent)
+          indexData = { songs: Array.isArray(parsed.songs) ? parsed.songs : [] }
+        } catch (e) {
+          indexData = { songs: [] }
+        }
+      }
+
+      // Buscar la canción original en dist para copiar sus datos
+      const distIndexPath = path.join(__dirname, 'dist', 'songs', 'index.json')
+      let originalSong = null
+      if (fs.existsSync(distIndexPath)) {
+        try {
+          const distContent = fs.readFileSync(distIndexPath, 'utf8')
+          const distData = JSON.parse(distContent)
+          originalSong = distData.songs?.find(s => s.id === songId)
+        } catch (e) {}
+      }
+
+      // Crear entrada para uploads index
+      const songEntry = {
+        id: songId,
+        title: notesData.song?.title || originalSong?.title || songId,
+        artist: notesData.song?.artist || originalSong?.artist || 'Desconocido',
+        audio: originalSong?.audio || `/songs/${songId}.mp3`,
+        notes: `/uploads/songs/${notesFilename}`,
+        bpm: notesData.bpm || originalSong?.bpm || 120
+      }
+
+      // Copiar campos adicionales si existen
+      if (originalSong?.videoId) {
+        songEntry.videoId = originalSong.videoId
+        songEntry.type = 'youtube'
+      }
+
+      // Actualizar o agregar
+      const existingIndex = indexData.songs.findIndex(s => s.id === songId)
+      if (existingIndex >= 0) {
+        indexData.songs[existingIndex] = songEntry
+      } else {
+        indexData.songs.push(songEntry)
+      }
+
+      fs.writeFileSync(indexPath, JSON.stringify(indexData, null, 2))
+      console.log(`[SaveNotes] Actualizado index de uploads para ${songId}`)
+    }
 
     res.json({
       success: true,
@@ -390,33 +463,43 @@ app.post('/api/save-notes', (req, res) => {
 
 // Endpoint para obtener lista de canciones
 app.get('/api/songs', (req, res) => {
-  let allSongs = []
+  const songsMap = new Map() // Usar Map para evitar duplicados por ID
 
+  // Primero cargar canciones de dist
   const distIndexPath = path.join(__dirname, 'dist', 'songs', 'index.json')
   if (fs.existsSync(distIndexPath)) {
     try {
       const distContent = fs.readFileSync(distIndexPath, 'utf8')
       const distData = JSON.parse(distContent)
       if (Array.isArray(distData.songs)) {
-        allSongs = distData.songs.map(s => ({
-          ...s,
-          audio: s.audio.startsWith('/') ? s.audio : `/songs/${s.audio}`,
-          notes: s.notes.startsWith('/') ? s.notes : `/songs/${s.notes}`
-        }))
+        distData.songs.forEach(s => {
+          songsMap.set(s.id, {
+            ...s,
+            audio: s.audio.startsWith('/') ? s.audio : `/songs/${s.audio}`,
+            notes: s.notes.startsWith('/') ? s.notes : `/songs/${s.notes}`
+          })
+        })
       }
     } catch (e) {}
   }
 
+  // Luego cargar de uploads (sobrescribe las de dist si tienen mismo ID)
   const uploadsIndexPath = path.join(UPLOADS_DIR, 'index.json')
   if (fs.existsSync(uploadsIndexPath)) {
     try {
       const uploadsContent = fs.readFileSync(uploadsIndexPath, 'utf8')
       const uploadsData = JSON.parse(uploadsContent)
       if (Array.isArray(uploadsData.songs)) {
-        allSongs = [...allSongs, ...uploadsData.songs]
+        uploadsData.songs.forEach(s => {
+          // Sobrescribir si existe, o agregar si es nueva
+          songsMap.set(s.id, s)
+        })
       }
     } catch (e) {}
   }
+
+  // Convertir Map a array
+  const allSongs = Array.from(songsMap.values())
 
   res.json({ songs: allSongs })
 })

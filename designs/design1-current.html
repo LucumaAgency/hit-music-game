@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guitar Hero - Design 1: Current (Two Columns)</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #0a0a0a;
+      color: white;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .menu {
+      background: rgba(20, 20, 40, 0.95);
+      padding: 30px 40px;
+      border-radius: 20px;
+      border: 2px solid #444;
+      max-width: 900px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .menu-layout {
+      display: flex;
+      gap: 40px;
+    }
+
+    .menu-column:first-child {
+      min-width: 280px;
+      max-width: 320px;
+    }
+
+    .menu-column:last-child {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .menu-column h2 {
+      text-align: center;
+      margin-bottom: 15px;
+      font-size: 1.4rem;
+      border-bottom: 1px solid #444;
+      padding-bottom: 10px;
+    }
+
+    .song-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .song-button {
+      display: flex;
+      flex-direction: column;
+      padding: 15px 20px;
+      background: linear-gradient(135deg, #1a1a2e, #2a2a4e);
+      border: 1px solid #444;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-align: left;
+    }
+
+    .song-button:hover {
+      background: linear-gradient(135deg, #2a2a4e, #3a3a6e);
+      border-color: #22c55e;
+      transform: scale(1.02);
+    }
+
+    .song-title {
+      font-size: 1.1rem;
+      color: white;
+      font-weight: bold;
+    }
+
+    .song-artist {
+      font-size: 0.9rem;
+      color: #888;
+    }
+
+    .yt-badge {
+      background: #ef4444;
+      color: white;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      margin-right: 8px;
+      font-weight: bold;
+    }
+
+    .upload-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+      max-width: 350px;
+    }
+
+    .upload-input {
+      padding: 12px 15px;
+      font-size: 0.95rem;
+      background: #1a1a2e;
+      border: 1px solid #444;
+      border-radius: 8px;
+      color: white;
+      width: 100%;
+    }
+
+    .upload-input:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+
+    .upload-input.youtube-url {
+      border-color: #ef4444;
+    }
+
+    .upload-hint {
+      font-size: 0.8rem;
+      color: #888;
+      text-align: center;
+    }
+
+    .upload-button {
+      padding: 15px;
+      font-size: 1rem;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .upload-button:hover {
+      transform: scale(1.02);
+      box-shadow: 0 0 30px rgba(59, 130, 246, 0.5);
+    }
+
+    .menu-divider {
+      height: 1px;
+      background: #444;
+      margin: 20px 0;
+      width: 100%;
+    }
+
+    .multiplayer-btn {
+      width: 100%;
+      max-width: 350px;
+      padding: 15px 25px;
+      font-size: 1.1rem;
+      background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .multiplayer-btn:hover {
+      transform: scale(1.02);
+      box-shadow: 0 0 25px rgba(139, 92, 246, 0.5);
+    }
+
+    .instructions {
+      font-size: 1rem;
+      margin-top: 20px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="menu">
+    <div class="menu-layout">
+      <div class="menu-column">
+        <h2>Canciones</h2>
+        <div class="song-list">
+          <button class="song-button">
+            <span class="song-title"><span class="yt-badge">YT</span>Through The Fire And Flames</span>
+            <span class="song-artist">DragonForce</span>
+          </button>
+          <button class="song-button">
+            <span class="song-title">Cliffs of Dover</span>
+            <span class="song-artist">Eric Johnson</span>
+          </button>
+          <button class="song-button">
+            <span class="song-title">Free Bird</span>
+            <span class="song-artist">Lynyrd Skynyrd</span>
+          </button>
+          <button class="song-button">
+            <span class="song-title">Knights of Cydonia</span>
+            <span class="song-artist">Muse</span>
+          </button>
+          <button class="song-button">
+            <span class="song-title">Eruption</span>
+            <span class="song-artist">Van Halen</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="menu-column">
+        <h2>Subir Cancion</h2>
+        <div class="upload-section">
+          <input type="text" placeholder="Titulo (opcional)" class="upload-input">
+          <input type="text" placeholder="Artista (opcional)" class="upload-input">
+          <input type="text" placeholder="URL de YouTube (opcional)" class="upload-input youtube-url">
+          <p class="upload-hint">Si agregas YouTube URL, el video se usara para reproducir</p>
+          <button class="upload-button">Seleccionar MP3 y Subir</button>
+        </div>
+
+        <div class="menu-divider"></div>
+
+        <button class="multiplayer-btn">Multijugador</button>
+
+        <p class="instructions">Teclas: A S J K L</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

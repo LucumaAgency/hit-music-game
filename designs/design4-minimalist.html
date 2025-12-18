@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guitar Hero - Design 4: Minimalist</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #111;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      padding: 30px 50px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #222;
+    }
+
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 300;
+      letter-spacing: 0.3em;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 30px;
+    }
+
+    .nav-link {
+      color: #666;
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.3s;
+    }
+
+    .nav-link:hover {
+      color: #fff;
+    }
+
+    .main {
+      flex: 1;
+      display: flex;
+    }
+
+    .sidebar {
+      width: 350px;
+      border-right: 1px solid #222;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-header {
+      padding: 30px;
+      border-bottom: 1px solid #222;
+    }
+
+    .sidebar-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: #666;
+    }
+
+    .songs-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .song-item {
+      display: flex;
+      align-items: center;
+      padding: 20px 30px;
+      border-bottom: 1px solid #1a1a1a;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .song-item:hover {
+      background: #1a1a1a;
+    }
+
+    .song-item.active {
+      background: #1a1a1a;
+      border-left: 2px solid #fff;
+    }
+
+    .song-thumb {
+      width: 50px;
+      height: 50px;
+      background: linear-gradient(135deg, #333, #222);
+      border-radius: 8px;
+      margin-right: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+    }
+
+    .song-thumb.youtube {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+    }
+
+    .song-details {
+      flex: 1;
+    }
+
+    .song-title {
+      font-size: 0.95rem;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .song-artist {
+      font-size: 0.8rem;
+      color: #666;
+    }
+
+    .song-duration {
+      font-size: 0.8rem;
+      color: #444;
+    }
+
+    .content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 50px;
+    }
+
+    .content-title {
+      font-size: 2.5rem;
+      font-weight: 200;
+      margin-bottom: 10px;
+    }
+
+    .content-subtitle {
+      color: #666;
+      margin-bottom: 50px;
+    }
+
+    .action-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 200px);
+      gap: 20px;
+    }
+
+    .action-box {
+      padding: 40px 30px;
+      background: #1a1a1a;
+      border-radius: 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .action-box:hover {
+      background: #222;
+      transform: translateY(-3px);
+    }
+
+    .action-icon {
+      font-size: 2rem;
+      margin-bottom: 15px;
+    }
+
+    .action-label {
+      font-size: 0.85rem;
+      color: #888;
+    }
+
+    .keys-footer {
+      padding: 30px;
+      border-top: 1px solid #222;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .key {
+      width: 45px;
+      height: 45px;
+      background: #1a1a1a;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 500;
+      font-size: 0.9rem;
+      position: relative;
+    }
+
+    .key::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      border-radius: 8px 8px 0 0;
+    }
+
+    .key:nth-child(1)::before { background: #22c55e; }
+    .key:nth-child(2)::before { background: #ef4444; }
+    .key:nth-child(3)::before { background: #eab308; }
+    .key:nth-child(4)::before { background: #3b82f6; }
+    .key:nth-child(5)::before { background: #f97316; }
+
+    .upload-modal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #1a1a1a;
+      padding: 40px;
+      border-radius: 16px;
+      width: 400px;
+      display: none;
+    }
+
+    .modal-title {
+      font-size: 1.2rem;
+      font-weight: 500;
+      margin-bottom: 25px;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 14px 16px;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 0.9rem;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: #444;
+    }
+
+    .form-input::placeholder {
+      color: #555;
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 14px;
+      background: #fff;
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: opacity 0.3s;
+    }
+
+    .btn-submit:hover {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="logo">GUITAR FLASH</div>
+    <nav class="nav-links">
+      <a href="#" class="nav-link">Canciones</a>
+      <a href="#" class="nav-link">Multijugador</a>
+      <a href="#" class="nav-link">Ajustes</a>
+    </nav>
+  </header>
+
+  <main class="main">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">Biblioteca</div>
+      </div>
+      <div class="songs-list">
+        <div class="song-item active">
+          <div class="song-thumb youtube">YT</div>
+          <div class="song-details">
+            <div class="song-title">Through The Fire And Flames</div>
+            <div class="song-artist">DragonForce</div>
+          </div>
+          <div class="song-duration">7:21</div>
+        </div>
+        <div class="song-item">
+          <div class="song-thumb">🎵</div>
+          <div class="song-details">
+            <div class="song-title">Cliffs of Dover</div>
+            <div class="song-artist">Eric Johnson</div>
+          </div>
+          <div class="song-duration">4:52</div>
+        </div>
+        <div class="song-item">
+          <div class="song-thumb">🎵</div>
+          <div class="song-details">
+            <div class="song-title">Free Bird</div>
+            <div class="song-artist">Lynyrd Skynyrd</div>
+          </div>
+          <div class="song-duration">9:08</div>
+        </div>
+        <div class="song-item">
+          <div class="song-thumb">🎵</div>
+          <div class="song-details">
+            <div class="song-title">Knights of Cydonia</div>
+            <div class="song-artist">Muse</div>
+          </div>
+          <div class="song-duration">6:06</div>
+        </div>
+        <div class="song-item">
+          <div class="song-thumb">🎵</div>
+          <div class="song-details">
+            <div class="song-title">Eruption</div>
+            <div class="song-artist">Van Halen</div>
+          </div>
+          <div class="song-duration">1:42</div>
+        </div>
+      </div>
+    </aside>
+
+    <section class="content">
+      <h1 class="content-title">Bienvenido</h1>
+      <p class="content-subtitle">Selecciona una cancion o agrega una nueva</p>
+
+      <div class="action-grid">
+        <div class="action-box">
+          <div class="action-icon">▶</div>
+          <div class="action-label">Jugar</div>
+        </div>
+        <div class="action-box">
+          <div class="action-icon">⏺</div>
+          <div class="action-label">Grabar Notas</div>
+        </div>
+        <div class="action-box">
+          <div class="action-icon">↑</div>
+          <div class="action-label">Subir MP3</div>
+        </div>
+        <div class="action-box">
+          <div class="action-icon">👥</div>
+          <div class="action-label">Multijugador</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="keys-footer">
+    <div class="key">A</div>
+    <div class="key">S</div>
+    <div class="key">J</div>
+    <div class="key">K</div>
+    <div class="key">L</div>
+  </footer>
+</body>
+</html>

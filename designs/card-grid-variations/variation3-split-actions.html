@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Card Grid Variation 3: Split Actions Top</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #0a0a0a;
+      color: white;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      min-height: 100vh;
+      padding: 30px;
+    }
+
+    .container {
+      max-width: 1300px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .header h1 {
+      font-size: 2.5rem;
+      background: linear-gradient(90deg, #22c55e, #3b82f6, #f97316);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* Actions Grid */
+    .actions-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin-bottom: 50px;
+    }
+
+    .action-card {
+      background: linear-gradient(145deg, #151515, #1a1a1a);
+      border: 1px solid #252525;
+      border-radius: 16px;
+      padding: 30px;
+      transition: all 0.3s;
+    }
+
+    .action-card:hover {
+      border-color: #333;
+      transform: translateY(-3px);
+    }
+
+    .action-icon {
+      font-size: 2.5rem;
+      margin-bottom: 15px;
+    }
+
+    .action-title {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .action-desc {
+      color: #666;
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+    }
+
+    .action-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .action-input {
+      padding: 12px 15px;
+      background: #0a0a0a;
+      border: 1px solid #252525;
+      border-radius: 8px;
+      color: white;
+      font-size: 0.9rem;
+    }
+
+    .action-input:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+
+    .action-btn {
+      padding: 14px 20px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .action-btn.blue {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: white;
+    }
+
+    .action-btn.purple {
+      background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+      color: white;
+    }
+
+    .action-btn.green {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white;
+    }
+
+    .action-btn:hover {
+      transform: scale(1.02);
+    }
+
+    /* Keys display in card */
+    .keys-display {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 15px;
+    }
+
+    .key-box {
+      width: 45px;
+      height: 45px;
+      background: #0a0a0a;
+      border: 2px solid;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+
+    .key-box:nth-child(1) { border-color: #22c55e; color: #22c55e; }
+    .key-box:nth-child(2) { border-color: #ef4444; color: #ef4444; }
+    .key-box:nth-child(3) { border-color: #eab308; color: #eab308; }
+    .key-box:nth-child(4) { border-color: #3b82f6; color: #3b82f6; }
+    .key-box:nth-child(5) { border-color: #f97316; color: #f97316; }
+
+    /* Songs Section */
+    .songs-section {
+      margin-top: 20px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #222;
+    }
+
+    .section-title {
+      font-size: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .song-count {
+      background: #22c55e;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+    }
+
+    /* Horizontal scroll cards */
+    .songs-scroll {
+      display: flex;
+      gap: 20px;
+      overflow-x: auto;
+      padding-bottom: 20px;
+      scroll-snap-type: x mandatory;
+    }
+
+    .songs-scroll::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    .songs-scroll::-webkit-scrollbar-track {
+      background: #1a1a1a;
+      border-radius: 3px;
+    }
+
+    .songs-scroll::-webkit-scrollbar-thumb {
+      background: #22c55e;
+      border-radius: 3px;
+    }
+
+    .song-card {
+      flex: 0 0 300px;
+      scroll-snap-align: start;
+      background: linear-gradient(145deg, #151515, #1a1a1a);
+      border: 1px solid #252525;
+      border-radius: 16px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .song-card:hover {
+      transform: scale(1.02);
+      border-color: #22c55e;
+    }
+
+    .song-card.youtube:hover {
+      border-color: #ef4444;
+    }
+
+    .card-visual {
+      height: 150px;
+      background: linear-gradient(135deg, #1a1a1a, #252525);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 4rem;
+      position: relative;
+    }
+
+    .card-visual.youtube {
+      background: linear-gradient(135deg, #ef4444, #b91c1c);
+    }
+
+    .yt-tag {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(0,0,0,0.6);
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.7rem;
+      font-weight: bold;
+    }
+
+    .card-details {
+      padding: 20px;
+    }
+
+    .song-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .song-artist {
+      color: #888;
+      font-size: 0.9rem;
+      margin-bottom: 15px;
+    }
+
+    .song-stats {
+      display: flex;
+      justify-content: space-between;
+      color: #666;
+      font-size: 0.85rem;
+    }
+
+    .difficulty {
+      color: #eab308;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>Guitar Flash</h1>
+    </header>
+
+    <div class="actions-grid">
+      <div class="action-card">
+        <div class="action-icon">📤</div>
+        <h3 class="action-title">Subir Cancion</h3>
+        <p class="action-desc">Agrega tu propia musica al juego</p>
+        <div class="action-form">
+          <input type="text" placeholder="Titulo" class="action-input">
+          <input type="text" placeholder="Artista" class="action-input">
+          <button class="action-btn blue">Seleccionar MP3</button>
+        </div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-icon">👥</div>
+        <h3 class="action-title">Multijugador</h3>
+        <p class="action-desc">Compite con otros jugadores en tiempo real</p>
+        <div class="action-form">
+          <input type="text" placeholder="Tu nombre" class="action-input">
+          <input type="text" placeholder="Codigo de sala (opcional)" class="action-input">
+          <button class="action-btn purple">Jugar Online</button>
+        </div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-icon">🎮</div>
+        <h3 class="action-title">Controles</h3>
+        <p class="action-desc">Usa estas teclas para tocar las notas</p>
+        <div class="keys-display">
+          <div class="key-box">A</div>
+          <div class="key-box">S</div>
+          <div class="key-box">J</div>
+          <div class="key-box">K</div>
+          <div class="key-box">L</div>
+        </div>
+        <button class="action-btn green" style="margin-top: 20px; width: 100%;">Juego Rapido</button>
+      </div>
+    </div>
+
+    <section class="songs-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          🎵 Canciones
+          <span class="song-count">6</span>
+        </h2>
+      </div>
+
+      <div class="songs-scroll">
+        <div class="song-card youtube">
+          <div class="card-visual youtube">
+            ▶
+            <span class="yt-tag">YouTube</span>
+          </div>
+          <div class="card-details">
+            <div class="song-title">Through The Fire And Flames</div>
+            <div class="song-artist">DragonForce</div>
+            <div class="song-stats">
+              <span>7:21</span>
+              <span class="difficulty">★★★★★ Expert</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="song-card">
+          <div class="card-visual">🎸</div>
+          <div class="card-details">
+            <div class="song-title">Cliffs of Dover</div>
+            <div class="song-artist">Eric Johnson</div>
+            <div class="song-stats">
+              <span>4:52</span>
+              <span class="difficulty">★★★★☆ Hard</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="song-card">
+          <div class="card-visual">🎸</div>
+          <div class="card-details">
+            <div class="song-title">Free Bird</div>
+            <div class="song-artist">Lynyrd Skynyrd</div>
+            <div class="song-stats">
+              <span>9:08</span>
+              <span class="difficulty">★★★★☆ Hard</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="song-card">
+          <div class="card-visual">🎸</div>
+          <div class="card-details">
+            <div class="song-title">Knights of Cydonia</div>
+            <div class="song-artist">Muse</div>
+            <div class="song-stats">
+              <span>6:06</span>
+              <span class="difficulty">★★★☆☆ Medium</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="song-card">
+          <div class="card-visual">🎸</div>
+          <div class="card-details">
+            <div class="song-title">Eruption</div>
+            <div class="song-artist">Van Halen</div>
+            <div class="song-stats">
+              <span>1:42</span>
+              <span class="difficulty">★★★★★ Expert</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="song-card youtube">
+          <div class="card-visual youtube">
+            ▶
+            <span class="yt-tag">YouTube</span>
+          </div>
+          <div class="card-details">
+            <div class="song-title">Raining Blood</div>
+            <div class="song-artist">Slayer</div>
+            <div class="song-stats">
+              <span>4:17</span>
+              <span class="difficulty">★★★★★ Expert</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

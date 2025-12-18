@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Card Grid Variation 5: Full Width Banner</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #0a0a0a;
+      color: white;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* Full Width Banner */
+    .banner {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      padding: 80px 40px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .banner::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background:
+        radial-gradient(circle at 20% 50%, rgba(34, 197, 94, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 80% 50%, rgba(59, 130, 246, 0.15) 0%, transparent 40%);
+    }
+
+    .banner-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 60px;
+    }
+
+    .banner-text {
+      flex: 1;
+    }
+
+    .banner-text h1 {
+      font-size: 4rem;
+      font-weight: 800;
+      margin-bottom: 15px;
+      background: linear-gradient(90deg, #fff, #22c55e);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .banner-text p {
+      font-size: 1.3rem;
+      color: #888;
+      margin-bottom: 30px;
+      max-width: 500px;
+    }
+
+    .banner-buttons {
+      display: flex;
+      gap: 15px;
+    }
+
+    .banner-btn {
+      padding: 16px 35px;
+      border: none;
+      border-radius: 12px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .banner-btn.green {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white;
+    }
+
+    .banner-btn.purple {
+      background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+      color: white;
+    }
+
+    .banner-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+
+    /* Banner right side - Upload form */
+    .banner-upload {
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(10px);
+      padding: 30px;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.1);
+      width: 350px;
+    }
+
+    .upload-title {
+      font-size: 1.2rem;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .upload-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .upload-input {
+      padding: 14px 18px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      color: white;
+      font-size: 0.95rem;
+    }
+
+    .upload-input:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+
+    .upload-input::placeholder {
+      color: #666;
+    }
+
+    .upload-btn {
+      padding: 14px;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      border: none;
+      border-radius: 10px;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .upload-btn:hover {
+      transform: scale(1.02);
+    }
+
+    /* Keys Row in Banner */
+    .keys-banner {
+      display: flex;
+      gap: 10px;
+      margin-top: 30px;
+    }
+
+    .key-b {
+      width: 55px;
+      height: 55px;
+      background: rgba(255,255,255,0.05);
+      border: 2px solid;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 1.3rem;
+      transition: all 0.3s;
+    }
+
+    .key-b:nth-child(1) { border-color: #22c55e; color: #22c55e; }
+    .key-b:nth-child(2) { border-color: #ef4444; color: #ef4444; }
+    .key-b:nth-child(3) { border-color: #eab308; color: #eab308; }
+    .key-b:nth-child(4) { border-color: #3b82f6; color: #3b82f6; }
+    .key-b:nth-child(5) { border-color: #f97316; color: #f97316; }
+
+    .key-b:hover {
+      transform: scale(1.1);
+      background: rgba(255,255,255,0.1);
+    }
+
+    /* Songs Section */
+    .songs-section {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 50px 40px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+
+    .section-title {
+      font-size: 2rem;
+      font-weight: 700;
+    }
+
+    .section-title span {
+      color: #22c55e;
+    }
+
+    .filter-pills {
+      display: flex;
+      gap: 10px;
+    }
+
+    .pill {
+      padding: 8px 20px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 25px;
+      color: #888;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-size: 0.9rem;
+    }
+
+    .pill:hover, .pill.active {
+      background: #22c55e;
+      border-color: #22c55e;
+      color: white;
+    }
+
+    /* Songs Grid - Large cards */
+    .songs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 25px;
+    }
+
+    .song-card {
+      background: #111;
+      border-radius: 20px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.3s;
+      border: 1px solid #222;
+    }
+
+    .song-card:hover {
+      transform: scale(1.02);
+      border-color: #22c55e;
+      box-shadow: 0 20px 50px rgba(34, 197, 94, 0.15);
+    }
+
+    .song-card.youtube:hover {
+      border-color: #ef4444;
+      box-shadow: 0 20px 50px rgba(239, 68, 68, 0.15);
+    }
+
+    .card-hero {
+      height: 180px;
+      background: linear-gradient(135deg, #1a1a1a, #252525);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 5rem;
+      position: relative;
+    }
+
+    .card-hero.youtube {
+      background: linear-gradient(135deg, #ef4444, #b91c1c);
+    }
+
+    .hero-badge {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      background: rgba(0,0,0,0.6);
+      padding: 6px 14px;
+      border-radius: 25px;
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+
+    .hero-play {
+      position: absolute;
+      bottom: 15px;
+      right: 15px;
+      width: 50px;
+      height: 50px;
+      background: #22c55e;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      opacity: 0;
+      transform: scale(0.8);
+      transition: all 0.3s;
+    }
+
+    .song-card:hover .hero-play {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .song-card.youtube .hero-play {
+      background: #ef4444;
+    }
+
+    .card-info {
+      padding: 25px;
+    }
+
+    .song-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .song-artist {
+      color: #888;
+      font-size: 1rem;
+      margin-bottom: 18px;
+    }
+
+    .card-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .meta-left {
+      display: flex;
+      gap: 20px;
+      color: #555;
+      font-size: 0.9rem;
+    }
+
+    .difficulty-badge {
+      padding: 6px 14px;
+      background: rgba(234, 179, 8, 0.15);
+      color: #eab308;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .difficulty-badge.expert {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+    }
+
+    .difficulty-badge.medium {
+      background: rgba(34, 197, 94, 0.15);
+      color: #22c55e;
+    }
+  </style>
+</head>
+<body>
+  <section class="banner">
+    <div class="banner-content">
+      <div class="banner-text">
+        <h1>Guitar Flash</h1>
+        <p>El mejor juego de ritmo. Toca tus canciones favoritas y compite con jugadores de todo el mundo.</p>
+        <div class="banner-buttons">
+          <button class="banner-btn green">Juego Rapido</button>
+          <button class="banner-btn purple">Multijugador</button>
+        </div>
+        <div class="keys-banner">
+          <div class="key-b">A</div>
+          <div class="key-b">S</div>
+          <div class="key-b">J</div>
+          <div class="key-b">K</div>
+          <div class="key-b">L</div>
+        </div>
+      </div>
+
+      <div class="banner-upload">
+        <h3 class="upload-title">📤 Subir Cancion</h3>
+        <div class="upload-form">
+          <input type="text" placeholder="Titulo" class="upload-input">
+          <input type="text" placeholder="Artista" class="upload-input">
+          <input type="text" placeholder="URL de YouTube (opcional)" class="upload-input">
+          <button class="upload-btn">Seleccionar MP3</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="songs-section">
+    <div class="section-header">
+      <h2 class="section-title">Canciones <span>Disponibles</span></h2>
+      <div class="filter-pills">
+        <span class="pill active">Todas</span>
+        <span class="pill">YouTube</span>
+        <span class="pill">Local</span>
+        <span class="pill">Favoritas</span>
+      </div>
+    </div>
+
+    <div class="songs-grid">
+      <div class="song-card youtube">
+        <div class="card-hero youtube">
+          ▶
+          <span class="hero-badge">YouTube</span>
+          <div class="hero-play">▶</div>
+        </div>
+        <div class="card-info">
+          <div class="song-title">Through The Fire And Flames</div>
+          <div class="song-artist">DragonForce</div>
+          <div class="card-meta">
+            <div class="meta-left">
+              <span>⏱ 7:21</span>
+              <span>🎵 1,847 notas</span>
+            </div>
+            <span class="difficulty-badge expert">Expert</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="song-card">
+        <div class="card-hero">
+          🎸
+          <div class="hero-play">▶</div>
+        </div>
+        <div class="card-info">
+          <div class="song-title">Cliffs of Dover</div>
+          <div class="song-artist">Eric Johnson</div>
+          <div class="card-meta">
+            <div class="meta-left">
+              <span>⏱ 4:52</span>
+              <span>🎵 923 notas</span>
+            </div>
+            <span class="difficulty-badge">Hard</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="song-card">
+        <div class="card-hero">
+          🎸
+          <div class="hero-play">▶</div>
+        </div>
+        <div class="card-info">
+          <div class="song-title">Free Bird</div>
+          <div class="song-artist">Lynyrd Skynyrd</div>
+          <div class="card-meta">
+            <div class="meta-left">
+              <span>⏱ 9:08</span>
+              <span>🎵 1,205 notas</span>
+            </div>
+            <span class="difficulty-badge">Hard</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="song-card">
+        <div class="card-hero">
+          🎸
+          <div class="hero-play">▶</div>
+        </div>
+        <div class="card-info">
+          <div class="song-title">Knights of Cydonia</div>
+          <div class="song-artist">Muse</div>
+          <div class="card-meta">
+            <div class="meta-left">
+              <span>⏱ 6:06</span>
+              <span>🎵 756 notas</span>
+            </div>
+            <span class="difficulty-badge medium">Medium</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="song-card">
+        <div class="card-hero">
+          🎸
+          <div class="hero-play">▶</div>
+        </div>
+        <div class="card-info">
+          <div class="song-title">Eruption</div>
+          <div class="song-artist">Van Halen</div>
+          <div class="card-meta">
+            <div class="meta-left">
+              <span>⏱ 1:42</span>
+              <span>🎵 2,103 notas</span>
+            </div>
+            <span class="difficulty-badge expert">Expert</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="song-card youtube">
+        <div class="card-hero youtube">
+          ▶
+          <span class="hero-badge">YouTube</span>
+          <div class="hero-play">▶</div>
+        </div>
+        <div class="card-info">
+          <div class="song-title">Raining Blood</div>
+          <div class="song-artist">Slayer</div>
+          <div class="card-meta">
+            <div class="meta-left">
+              <span>⏱ 4:17</span>
+              <span>🎵 1,456 notas</span>
+            </div>
+            <span class="difficulty-badge expert">Expert</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</body>
+</html>

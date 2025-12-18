@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guitar Hero - Design 5: Glassmorphism</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Floating orbs background */
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      animation: float 20s infinite;
+    }
+
+    .orb-1 {
+      width: 400px;
+      height: 400px;
+      background: rgba(139, 92, 246, 0.3);
+      top: -100px;
+      left: -100px;
+    }
+
+    .orb-2 {
+      width: 300px;
+      height: 300px;
+      background: rgba(34, 197, 94, 0.3);
+      bottom: -50px;
+      right: -50px;
+      animation-delay: -5s;
+    }
+
+    .orb-3 {
+      width: 250px;
+      height: 250px;
+      background: rgba(59, 130, 246, 0.3);
+      top: 50%;
+      left: 50%;
+      animation-delay: -10s;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      25% { transform: translate(30px, -30px) scale(1.1); }
+      50% { transform: translate(-20px, 20px) scale(0.9); }
+      75% { transform: translate(20px, 30px) scale(1.05); }
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 1000px;
+    }
+
+    .glass-card {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 24px;
+      padding: 40px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .title {
+      font-size: 3rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #fff 0%, #a78bfa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 1rem;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+    }
+
+    .section {
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 16px;
+      padding: 25px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .section-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: rgba(255, 255, 255, 0.4);
+      margin-bottom: 20px;
+    }
+
+    .songs-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 350px;
+      overflow-y: auto;
+    }
+
+    .songs-list::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .songs-list::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+    }
+
+    .songs-list::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+    }
+
+    .song-item {
+      display: flex;
+      align-items: center;
+      padding: 15px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s;
+      border: 1px solid transparent;
+    }
+
+    .song-item:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(139, 92, 246, 0.3);
+      transform: translateX(5px);
+    }
+
+    .song-icon {
+      width: 45px;
+      height: 45px;
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(59, 130, 246, 0.3));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 15px;
+      font-size: 1.2rem;
+    }
+
+    .song-icon.youtube {
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.4), rgba(249, 115, 22, 0.3));
+    }
+
+    .song-info {
+      flex: 1;
+    }
+
+    .song-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 3px;
+    }
+
+    .song-artist {
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .upload-form {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .glass-input {
+      padding: 14px 18px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      color: white;
+      font-size: 0.95rem;
+      transition: all 0.3s;
+    }
+
+    .glass-input:focus {
+      outline: none;
+      border-color: rgba(139, 92, 246, 0.5);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .glass-input::placeholder {
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    .glass-btn {
+      padding: 16px 24px;
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(59, 130, 246, 0.4));
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      color: white;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .glass-btn:hover {
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.6), rgba(59, 130, 246, 0.6));
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
+    }
+
+    .glass-btn.green {
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.4), rgba(16, 185, 129, 0.4));
+    }
+
+    .glass-btn.green:hover {
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.6), rgba(16, 185, 129, 0.6));
+      box-shadow: 0 10px 30px rgba(34, 197, 94, 0.3);
+    }
+
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+      margin: 20px 0;
+    }
+
+    .keys-section {
+      margin-top: 30px;
+      text-align: center;
+    }
+
+    .keys-label {
+      color: rgba(255, 255, 255, 0.4);
+      font-size: 0.8rem;
+      margin-bottom: 15px;
+    }
+
+    .keys-row {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .key-item {
+      width: 55px;
+      height: 55px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.2rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .key-item::before {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+    }
+
+    .key-item:nth-child(1)::before { background: #22c55e; }
+    .key-item:nth-child(2)::before { background: #ef4444; }
+    .key-item:nth-child(3)::before { background: #eab308; }
+    .key-item:nth-child(4)::before { background: #3b82f6; }
+    .key-item:nth-child(5)::before { background: #f97316; }
+
+    .key-item:nth-child(1) { color: #22c55e; }
+    .key-item:nth-child(2) { color: #ef4444; }
+    .key-item:nth-child(3) { color: #eab308; }
+    .key-item:nth-child(4) { color: #3b82f6; }
+    .key-item:nth-child(5) { color: #f97316; }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <div class="container">
+    <div class="glass-card">
+      <div class="header">
+        <h1 class="title">Guitar Flash</h1>
+        <p class="subtitle">Rhythm game experience</p>
+      </div>
+
+      <div class="content-grid">
+        <div class="section">
+          <div class="section-title">Canciones disponibles</div>
+          <div class="songs-list">
+            <div class="song-item">
+              <div class="song-icon youtube">▶</div>
+              <div class="song-info">
+                <div class="song-title">Through The Fire And Flames</div>
+                <div class="song-artist">DragonForce</div>
+              </div>
+            </div>
+            <div class="song-item">
+              <div class="song-icon">🎵</div>
+              <div class="song-info">
+                <div class="song-title">Cliffs of Dover</div>
+                <div class="song-artist">Eric Johnson</div>
+              </div>
+            </div>
+            <div class="song-item">
+              <div class="song-icon">🎵</div>
+              <div class="song-info">
+                <div class="song-title">Free Bird</div>
+                <div class="song-artist">Lynyrd Skynyrd</div>
+              </div>
+            </div>
+            <div class="song-item">
+              <div class="song-icon">🎵</div>
+              <div class="song-info">
+                <div class="song-title">Knights of Cydonia</div>
+                <div class="song-artist">Muse</div>
+              </div>
+            </div>
+            <div class="song-item">
+              <div class="song-icon">🎵</div>
+              <div class="song-info">
+                <div class="song-title">Eruption</div>
+                <div class="song-artist">Van Halen</div>
+              </div>
+            </div>
+            <div class="song-item">
+              <div class="song-icon youtube">▶</div>
+              <div class="song-info">
+                <div class="song-title">Raining Blood</div>
+                <div class="song-artist">Slayer</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Agregar cancion</div>
+          <div class="upload-form">
+            <input type="text" placeholder="Titulo" class="glass-input">
+            <input type="text" placeholder="Artista" class="glass-input">
+            <input type="text" placeholder="URL de YouTube (opcional)" class="glass-input">
+            <button class="glass-btn">Subir MP3</button>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="section-title">Multijugador</div>
+          <button class="glass-btn green">Crear o unirse a sala</button>
+        </div>
+      </div>
+
+      <div class="keys-section">
+        <div class="keys-label">Teclas de juego</div>
+        <div class="keys-row">
+          <div class="key-item">A</div>
+          <div class="key-item">S</div>
+          <div class="key-item">J</div>
+          <div class="key-item">K</div>
+          <div class="key-item">L</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

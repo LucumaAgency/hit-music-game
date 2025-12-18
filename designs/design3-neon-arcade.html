@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guitar Hero - Design 3: Neon Arcade</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #000;
+      color: white;
+      font-family: 'Orbitron', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background:
+        radial-gradient(ellipse at 50% 0%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 0% 100%, rgba(34, 197, 94, 0.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 100% 100%, rgba(59, 130, 246, 0.1) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 40px;
+    }
+
+    .title {
+      font-size: 4rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      margin-bottom: 10px;
+      background: linear-gradient(180deg, #fff 0%, #8b5cf6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 80px rgba(139, 92, 246, 0.5);
+      animation: glow 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes glow {
+      from { filter: drop-shadow(0 0 20px rgba(139, 92, 246, 0.5)); }
+      to { filter: drop-shadow(0 0 40px rgba(139, 92, 246, 0.8)); }
+    }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: #666;
+      letter-spacing: 0.5em;
+      margin-bottom: 50px;
+    }
+
+    .menu-box {
+      background: rgba(10, 10, 20, 0.9);
+      border: 2px solid;
+      border-image: linear-gradient(135deg, #8b5cf6, #3b82f6, #22c55e) 1;
+      padding: 40px;
+      max-width: 800px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    .menu-box::before,
+    .menu-box::after {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #8b5cf6;
+    }
+
+    .menu-box::before {
+      top: -5px;
+      left: -5px;
+      border-right: none;
+      border-bottom: none;
+    }
+
+    .menu-box::after {
+      bottom: -5px;
+      right: -5px;
+      border-left: none;
+      border-top: none;
+    }
+
+    .section-label {
+      font-size: 0.7rem;
+      color: #8b5cf6;
+      letter-spacing: 0.3em;
+      margin-bottom: 20px;
+    }
+
+    .songs-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 40px;
+    }
+
+    .song-item {
+      display: flex;
+      align-items: center;
+      padding: 15px 25px;
+      background: linear-gradient(90deg, rgba(139, 92, 246, 0.1), transparent);
+      border-left: 3px solid #8b5cf6;
+      cursor: pointer;
+      transition: all 0.3s;
+      text-align: left;
+    }
+
+    .song-item:hover {
+      background: linear-gradient(90deg, rgba(139, 92, 246, 0.3), rgba(59, 130, 246, 0.1));
+      border-left-color: #22c55e;
+      transform: translateX(10px);
+    }
+
+    .song-item.youtube {
+      border-left-color: #ef4444;
+    }
+
+    .song-item.youtube:hover {
+      background: linear-gradient(90deg, rgba(239, 68, 68, 0.3), rgba(249, 115, 22, 0.1));
+    }
+
+    .song-number {
+      font-size: 1.5rem;
+      font-weight: 900;
+      color: #333;
+      width: 50px;
+    }
+
+    .song-info {
+      flex: 1;
+    }
+
+    .song-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
+
+    .song-artist {
+      font-size: 0.75rem;
+      color: #666;
+      font-weight: 400;
+    }
+
+    .yt-tag {
+      background: #ef4444;
+      color: white;
+      padding: 3px 8px;
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      margin-left: 10px;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      margin-top: 30px;
+    }
+
+    .neon-btn {
+      padding: 15px 40px;
+      background: transparent;
+      border: 2px solid;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      cursor: pointer;
+      transition: all 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .neon-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.5s;
+    }
+
+    .neon-btn:hover::before {
+      left: 100%;
+    }
+
+    .neon-btn.green {
+      border-color: #22c55e;
+      color: #22c55e;
+    }
+
+    .neon-btn.green:hover {
+      background: #22c55e;
+      color: #000;
+      box-shadow: 0 0 30px rgba(34, 197, 94, 0.5);
+    }
+
+    .neon-btn.purple {
+      border-color: #8b5cf6;
+      color: #8b5cf6;
+    }
+
+    .neon-btn.purple:hover {
+      background: #8b5cf6;
+      color: #000;
+      box-shadow: 0 0 30px rgba(139, 92, 246, 0.5);
+    }
+
+    .keys-display {
+      margin-top: 50px;
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+    }
+
+    .key-box {
+      width: 60px;
+      height: 60px;
+      border: 2px solid;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: 900;
+      position: relative;
+    }
+
+    .key-box::after {
+      content: '';
+      position: absolute;
+      bottom: -20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 3px;
+      height: 15px;
+      background: inherit;
+      opacity: 0.5;
+    }
+
+    .key-box:nth-child(1) { border-color: #22c55e; color: #22c55e; }
+    .key-box:nth-child(2) { border-color: #ef4444; color: #ef4444; }
+    .key-box:nth-child(3) { border-color: #eab308; color: #eab308; }
+    .key-box:nth-child(4) { border-color: #3b82f6; color: #3b82f6; }
+    .key-box:nth-child(5) { border-color: #f97316; color: #f97316; }
+
+    .scanline {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.1) 2px,
+        rgba(0, 0, 0, 0.1) 4px
+      );
+      pointer-events: none;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+  <div class="scanline"></div>
+
+  <div class="container">
+    <h1 class="title">Guitar Flash</h1>
+    <p class="subtitle">RHYTHM GAME</p>
+
+    <div class="menu-box">
+      <div class="section-label">SELECT TRACK</div>
+
+      <div class="songs-list">
+        <div class="song-item youtube">
+          <span class="song-number">01</span>
+          <div class="song-info">
+            <div class="song-title">THROUGH THE FIRE AND FLAMES<span class="yt-tag">YOUTUBE</span></div>
+            <div class="song-artist">DRAGONFORCE</div>
+          </div>
+        </div>
+        <div class="song-item">
+          <span class="song-number">02</span>
+          <div class="song-info">
+            <div class="song-title">CLIFFS OF DOVER</div>
+            <div class="song-artist">ERIC JOHNSON</div>
+          </div>
+        </div>
+        <div class="song-item">
+          <span class="song-number">03</span>
+          <div class="song-info">
+            <div class="song-title">FREE BIRD</div>
+            <div class="song-artist">LYNYRD SKYNYRD</div>
+          </div>
+        </div>
+        <div class="song-item">
+          <span class="song-number">04</span>
+          <div class="song-info">
+            <div class="song-title">KNIGHTS OF CYDONIA</div>
+            <div class="song-artist">MUSE</div>
+          </div>
+        </div>
+        <div class="song-item youtube">
+          <span class="song-number">05</span>
+          <div class="song-info">
+            <div class="song-title">RAINING BLOOD<span class="yt-tag">YOUTUBE</span></div>
+            <div class="song-artist">SLAYER</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="action-buttons">
+        <button class="neon-btn green">UPLOAD TRACK</button>
+        <button class="neon-btn purple">MULTIPLAYER</button>
+      </div>
+    </div>
+
+    <div class="keys-display">
+      <div class="key-box">A</div>
+      <div class="key-box">S</div>
+      <div class="key-box">J</div>
+      <div class="key-box">K</div>
+      <div class="key-box">L</div>
+    </div>
+  </div>
+</body>
+</html>

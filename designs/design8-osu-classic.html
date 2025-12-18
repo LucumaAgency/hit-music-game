@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guitar Hero - Design 8: osu! Classic</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;600;700&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --osu-pink: #ff66ab;
+      --osu-pink-dark: #cc5289;
+      --osu-blue: #66ccff;
+      --osu-purple: #8866ff;
+      --osu-bg: #2a2226;
+      --osu-bg-dark: #1a1417;
+      --osu-bg-light: #3a3236;
+    }
+
+    body {
+      background: var(--osu-bg-dark);
+      color: white;
+      font-family: 'Comfortaa', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Triangles background pattern */
+    .triangles-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background:
+        linear-gradient(135deg, transparent 25%, rgba(255, 102, 171, 0.03) 25%, rgba(255, 102, 171, 0.03) 50%, transparent 50%, transparent 75%, rgba(255, 102, 171, 0.03) 75%);
+      background-size: 60px 60px;
+      animation: moveTriangles 20s linear infinite;
+    }
+
+    @keyframes moveTriangles {
+      0% { background-position: 0 0; }
+      100% { background-position: 60px 60px; }
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    .header {
+      padding: 20px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: linear-gradient(180deg, rgba(0,0,0,0.5) 0%, transparent 100%);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .osu-cookie {
+      width: 50px;
+      height: 50px;
+      background: var(--osu-pink);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      box-shadow: 0 0 20px rgba(255, 102, 171, 0.5);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(255, 102, 171, 0.5); }
+      50% { transform: scale(1.05); box-shadow: 0 0 30px rgba(255, 102, 171, 0.7); }
+    }
+
+    .logo-text {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: white;
+    }
+
+    .logo-text span {
+      color: var(--osu-pink);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 25px;
+    }
+
+    .nav-link {
+      color: #888;
+      text-decoration: none;
+      font-size: 0.95rem;
+      transition: color 0.3s;
+      position: relative;
+    }
+
+    .nav-link:hover {
+      color: var(--osu-pink);
+    }
+
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      bottom: -5px;
+      left: 0;
+      width: 0;
+      height: 2px;
+      background: var(--osu-pink);
+      transition: width 0.3s;
+    }
+
+    .nav-link:hover::after {
+      width: 100%;
+    }
+
+    /* Main content */
+    .main {
+      flex: 1;
+      display: flex;
+      padding: 30px 40px;
+      gap: 30px;
+    }
+
+    /* Beatmap list */
+    .beatmap-panel {
+      flex: 1;
+      max-width: 600px;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .panel-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .beatmap-count {
+      background: var(--osu-pink);
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+    }
+
+    .search-box {
+      display: flex;
+      margin-bottom: 20px;
+    }
+
+    .search-input {
+      flex: 1;
+      padding: 12px 20px;
+      background: var(--osu-bg);
+      border: 2px solid var(--osu-bg-light);
+      border-radius: 25px 0 0 25px;
+      color: white;
+      font-family: 'Comfortaa', sans-serif;
+      font-size: 0.9rem;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: var(--osu-pink);
+    }
+
+    .search-btn {
+      padding: 12px 25px;
+      background: var(--osu-pink);
+      border: none;
+      border-radius: 0 25px 25px 0;
+      color: white;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .search-btn:hover {
+      background: var(--osu-pink-dark);
+    }
+
+    .beatmap-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 500px;
+      overflow-y: auto;
+      padding-right: 10px;
+    }
+
+    .beatmap-list::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .beatmap-list::-webkit-scrollbar-track {
+      background: var(--osu-bg);
+      border-radius: 3px;
+    }
+
+    .beatmap-list::-webkit-scrollbar-thumb {
+      background: var(--osu-pink);
+      border-radius: 3px;
+    }
+
+    .beatmap-card {
+      display: flex;
+      align-items: center;
+      padding: 15px;
+      background: var(--osu-bg);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s;
+      border: 2px solid transparent;
+    }
+
+    .beatmap-card:hover {
+      background: var(--osu-bg-light);
+      border-color: var(--osu-pink);
+      transform: translateX(5px);
+    }
+
+    .beatmap-thumb {
+      width: 60px;
+      height: 60px;
+      background: linear-gradient(135deg, var(--osu-pink), var(--osu-purple));
+      border-radius: 10px;
+      margin-right: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+
+    .beatmap-thumb.youtube {
+      background: linear-gradient(135deg, #ff4444, #ff6666);
+    }
+
+    .beatmap-info {
+      flex: 1;
+    }
+
+    .beatmap-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .beatmap-artist {
+      font-size: 0.85rem;
+      color: #888;
+      margin-bottom: 6px;
+    }
+
+    .beatmap-stats {
+      display: flex;
+      gap: 15px;
+    }
+
+    .stat {
+      font-size: 0.75rem;
+      color: #666;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .stat-icon {
+      color: var(--osu-pink);
+    }
+
+    .star-rating {
+      display: flex;
+      gap: 2px;
+      margin-left: auto;
+    }
+
+    .star {
+      color: #333;
+      font-size: 0.9rem;
+    }
+
+    .star.active {
+      color: #ffcc22;
+    }
+
+    /* Actions panel */
+    .actions-panel {
+      width: 350px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .action-card {
+      background: var(--osu-bg);
+      border-radius: 15px;
+      padding: 25px;
+      border: 2px solid var(--osu-bg-light);
+    }
+
+    .action-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .action-title .icon {
+      color: var(--osu-pink);
+    }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    .osu-input {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--osu-bg-dark);
+      border: 2px solid var(--osu-bg-light);
+      border-radius: 10px;
+      color: white;
+      font-family: 'Comfortaa', sans-serif;
+      font-size: 0.9rem;
+      transition: border-color 0.3s;
+    }
+
+    .osu-input:focus {
+      outline: none;
+      border-color: var(--osu-pink);
+    }
+
+    .osu-input::placeholder {
+      color: #555;
+    }
+
+    .osu-btn {
+      width: 100%;
+      padding: 14px 20px;
+      background: linear-gradient(135deg, var(--osu-pink), var(--osu-pink-dark));
+      border: none;
+      border-radius: 25px;
+      color: white;
+      font-family: 'Comfortaa', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .osu-btn:hover {
+      transform: scale(1.02);
+      box-shadow: 0 5px 20px rgba(255, 102, 171, 0.4);
+    }
+
+    .osu-btn.blue {
+      background: linear-gradient(135deg, var(--osu-blue), #4499dd);
+    }
+
+    .osu-btn.blue:hover {
+      box-shadow: 0 5px 20px rgba(102, 204, 255, 0.4);
+    }
+
+    /* Keys display */
+    .keys-card {
+      text-align: center;
+    }
+
+    .keys-label {
+      color: #666;
+      font-size: 0.85rem;
+      margin-bottom: 15px;
+    }
+
+    .keys-row {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .key-circle {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.1rem;
+      border: 3px solid;
+      transition: all 0.3s;
+      cursor: pointer;
+    }
+
+    .key-circle:hover {
+      transform: scale(1.1);
+    }
+
+    .key-circle:nth-child(1) { border-color: #22c55e; color: #22c55e; }
+    .key-circle:nth-child(2) { border-color: #ef4444; color: #ef4444; }
+    .key-circle:nth-child(3) { border-color: #eab308; color: #eab308; }
+    .key-circle:nth-child(4) { border-color: #3b82f6; color: #3b82f6; }
+    .key-circle:nth-child(5) { border-color: #f97316; color: #f97316; }
+
+    .key-circle:nth-child(1):hover { background: rgba(34, 197, 94, 0.2); }
+    .key-circle:nth-child(2):hover { background: rgba(239, 68, 68, 0.2); }
+    .key-circle:nth-child(3):hover { background: rgba(234, 179, 8, 0.2); }
+    .key-circle:nth-child(4):hover { background: rgba(59, 130, 246, 0.2); }
+    .key-circle:nth-child(5):hover { background: rgba(249, 115, 22, 0.2); }
+  </style>
+</head>
+<body>
+  <div class="triangles-bg"></div>
+
+  <div class="container">
+    <header class="header">
+      <div class="logo">
+        <div class="osu-cookie">🎵</div>
+        <span class="logo-text">Guitar<span>Flash</span></span>
+      </div>
+      <nav class="nav-links">
+        <a href="#" class="nav-link">inicio</a>
+        <a href="#" class="nav-link">beatmaps</a>
+        <a href="#" class="nav-link">rankings</a>
+        <a href="#" class="nav-link">multijugador</a>
+      </nav>
+    </header>
+
+    <main class="main">
+      <div class="beatmap-panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Beatmaps</h2>
+          <span class="beatmap-count">6 canciones</span>
+        </div>
+
+        <div class="search-box">
+          <input type="text" placeholder="Buscar beatmaps..." class="search-input">
+          <button class="search-btn">🔍</button>
+        </div>
+
+        <div class="beatmap-list">
+          <div class="beatmap-card">
+            <div class="beatmap-thumb youtube">▶</div>
+            <div class="beatmap-info">
+              <div class="beatmap-title">Through The Fire And Flames</div>
+              <div class="beatmap-artist">DragonForce</div>
+              <div class="beatmap-stats">
+                <span class="stat"><span class="stat-icon">♪</span> 7:21</span>
+                <span class="stat"><span class="stat-icon">◉</span> 1,847</span>
+              </div>
+            </div>
+            <div class="star-rating">
+              <span class="star active">★</span>
+              <span class="star active">★</span>
+              <span class="star active">★</span>
+              <span class="star active">★</span>
+              <span class="star active">★</span>
+            </div>
+          </div>
+
+          <div class="beatmap-card">
+            <div class="beatmap-thumb">🎸</div>
+            <div class="beatmap-info">
+              <div class="beatmap-title">Cliffs of Dover</div>
+              <div class="beatmap-artist">Eric Johnson</div>
+              <div class="beatmap-stats">
+                <span class="stat"><span class="stat-icon">♪</span> 4:52</span>
+                <span class="stat"><span class="stat-icon">◉</span> 923</span>
+              </div>
+            </div>
+            <div class="star-rating">
+              <span class="star active">★</span>
+              <span class="star active">★</span>
+              <span class="star active">★</span>
+              <span class="star active">★</span>
+              <span class="star">★</span>
+            </div>
+          </div>
+
+          <div class="beatmap-card">
+            <div class="beatmap-thumb">🎸</div>
+            <div class="beatmap-info">
+              <div class="beatmap-title">Free Bird</div>
+              <div class="beatmap-artist">Lynyrd Skynyrd</div>
+              <div class="beatmap-stats">
+                <span class="stat"><span class="stat-icon">♪</span> 9:08</span>
+                <span class="stat"><span class="stat-icon">◉</span> 1,205</span>
+              </div>
+            </div>
+            <div class="star-rating">
+              <span class="star active">★</span>
+              <span class="star active">★</span>
+              <span class="star active">★</span>
+              <span class="star active">★</span>
+              <span class="star">★</span>
+            </div>
+          </div>
+
+          <div class="beatmap-card">
+            <div class="beatmap-thumb">🎸</div>
+            <div class="beatmap-info">
+              <div class="beatmap-title">Knights of Cydonia</div>
+              <div class="beatmap-artist">Muse</div>
+              <div class="beatmap-stats">
+                <span class="stat"><span class="stat-icon">♪</span> 6:06</span>
+                <span class="stat"><span class="stat-icon">◉</span> 756</span>
+              </div>
+            </div>
+            <div class="star-rating">
+              <span class="star active">★</span>
+              <span class="star active">★</span>
+              <span class="star active">★</span>
+              <span class="star">★</span>
+              <span class="star">★</span>
+            </div>
+          </div>
+
+          <div class="beatmap-card">
+            <div class="beatmap-thumb">🎸</div>
+            <div class="beatmap-info">
+              <div class="beatmap-title">Eruption</div>
+              <div class="beatmap-artist">Van Halen</div>
+              <div class="beatmap-stats">
+                <span class="stat"><span class="stat-icon">♪</span> 1:42</span>
+                <span class="stat"><span class="stat-icon">◉</span> 2,103</span>
+              </div>
+            </div>
+            <div class="star-rating">
+              <span class="star active">★</span>
+              <span class="star active">★</span>
+              <span class="star active">★</span>
+              <span class="star active">★</span>
+              <span class="star active">★</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions-panel">
+        <div class="action-card">
+          <h3 class="action-title"><span class="icon">↑</span> Subir Beatmap</h3>
+          <div class="form-group">
+            <input type="text" placeholder="Titulo" class="osu-input">
+          </div>
+          <div class="form-group">
+            <input type="text" placeholder="Artista" class="osu-input">
+          </div>
+          <div class="form-group">
+            <input type="text" placeholder="YouTube URL (opcional)" class="osu-input">
+          </div>
+          <button class="osu-btn">Seleccionar MP3</button>
+        </div>
+
+        <div class="action-card">
+          <h3 class="action-title"><span class="icon">👥</span> Multijugador</h3>
+          <button class="osu-btn blue">Crear o Unirse a Sala</button>
+        </div>
+
+        <div class="action-card keys-card">
+          <p class="keys-label">Teclas de juego</p>
+          <div class="keys-row">
+            <div class="key-circle">A</div>
+            <div class="key-circle">S</div>
+            <div class="key-circle">J</div>
+            <div class="key-circle">K</div>
+            <div class="key-circle">L</div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

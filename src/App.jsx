@@ -1041,58 +1041,42 @@ function App() {
       </div>
 
       {gameState === 'idle' && !selectedSong && !isMultiplayer && !showMultiplayerMenu && (
-        <div className="menu menu-wide">
-          <div className="menu-layout">
-            {/* Columna izquierda - Lista de canciones */}
-            <div className="menu-column">
-              <h2>Canciones</h2>
-              <div className="song-list">
-                {songs.map(song => (
-                  <button
-                    key={song.id}
-                    className={`song-button ${song.type === 'youtube' ? 'youtube-song' : ''}`}
-                    onClick={() => loadSong(song)}
-                  >
-                    <span className="song-title">
-                      {song.type === 'youtube' && <span className="yt-badge">YT</span>}
-                      {song.title}
-                    </span>
-                    <span className="song-artist">{song.artist}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+        <div className="home-container">
+          {/* Header */}
+          <div className="home-header">
+            <h1>Guitar Flash Clone</h1>
+            <p>Selecciona una canción y demuestra tu habilidad</p>
+          </div>
 
-            {/* Columna derecha - Upload y opciones */}
-            <div className="menu-column">
-              <h2>Subir Canción</h2>
-              <div className="upload-section">
+          {/* Actions Row */}
+          <div className="actions-row">
+            <div className="action-card upload">
+              <h3>Subir Nueva Canción</h3>
+              <div className="action-form">
                 <input
                   type="text"
-                  placeholder="Título (opcional)"
+                  placeholder="Título"
                   value={uploadTitle}
                   onChange={(e) => setUploadTitle(e.target.value)}
-                  className="upload-input"
+                  className="action-input"
                   disabled={uploadLoading}
                 />
                 <input
                   type="text"
-                  placeholder="Artista (opcional)"
+                  placeholder="Artista"
                   value={uploadArtist}
                   onChange={(e) => setUploadArtist(e.target.value)}
-                  className="upload-input"
+                  className="action-input"
                   disabled={uploadLoading}
                 />
                 <input
                   type="text"
-                  placeholder="URL de YouTube para embed (opcional)"
+                  placeholder="URL YouTube (opcional)"
                   value={uploadYoutubeUrl}
                   onChange={(e) => setUploadYoutubeUrl(e.target.value)}
-                  className="upload-input youtube-url"
+                  className="action-input youtube"
                   disabled={uploadLoading}
                 />
-                <p className="upload-hint">Si agregas YouTube URL, el video se usará para reproducir</p>
-
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -1101,25 +1085,60 @@ function App() {
                   style={{ display: 'none' }}
                 />
                 <button
-                  className="upload-button"
+                  className="action-btn primary"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadLoading}
                 >
-                  {uploadLoading ? 'Subiendo...' : 'Seleccionar MP3 y Subir'}
+                  {uploadLoading ? 'Subiendo...' : 'Seleccionar MP3'}
                 </button>
+                <p className="action-hint">El audio será analizado automáticamente</p>
                 {uploadError && <p className="error-msg">{uploadError}</p>}
               </div>
+            </div>
 
-              <div className="menu-divider"></div>
-
+            <div className="action-card multiplayer">
+              <h3>Modo Multijugador</h3>
+              <p className="action-desc">Compite contra otros jugadores en tiempo real</p>
               <button
-                className="multiplayer-menu-btn"
+                className="action-btn purple"
                 onClick={() => setShowMultiplayerMenu(true)}
               >
-                🎮 Multijugador
+                Crear o Unirse a Sala
               </button>
+            </div>
+          </div>
 
-              <p className="instructions">Teclas: A S J K L</p>
+          {/* Keys Hint */}
+          <div className="keys-hint">
+            <p>Usa estas teclas para jugar:</p>
+            <div className="keys-row">
+              <div className="key-display green">A</div>
+              <div className="key-display red">S</div>
+              <div className="key-display yellow">J</div>
+              <div className="key-display blue">K</div>
+              <div className="key-display orange">L</div>
+            </div>
+          </div>
+
+          {/* Songs Section */}
+          <div className="songs-section">
+            <h2 className="section-title">Canciones Disponibles</h2>
+            <div className="songs-grid">
+              {songs.map(song => (
+                <div
+                  key={song.id}
+                  className={`song-card ${song.type === 'youtube' ? 'youtube' : ''}`}
+                  onClick={() => loadSong(song)}
+                >
+                  {song.type === 'youtube' && <span className="yt-badge">YouTube</span>}
+                  <div className="song-icon">{song.type === 'youtube' ? '🎸' : '🎵'}</div>
+                  <div className="song-title">{song.title}</div>
+                  <div className="song-artist">{song.artist}</div>
+                  <div className="song-meta">
+                    <span>{song.bpm ? `${song.bpm} BPM` : ''}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

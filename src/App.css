@@ -298,6 +298,7 @@ body {
   max-width: 900px;
   width: 90%;
   max-height: 80vh;
+  overflow-y: auto;
 }
 
 .menu-layout {
@@ -319,7 +320,7 @@ body {
 
 .menu-column:last-child {
   flex: 1;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
 }
 

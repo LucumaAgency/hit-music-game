@@ -34,6 +34,59 @@ app.get('/api/test', (req, res) => {
   })
 })
 
+// Endpoint de debug para diagnosticar problemas con canciones
+app.get('/api/debug', (req, res) => {
+  const debug = {
+    dirname: __dirname,
+    uploadsDir: UPLOADS_DIR,
+    uploadsExists: fs.existsSync(UPLOADS_DIR),
+    distSongsDir: path.join(__dirname, 'dist', 'songs'),
+    distSongsExists: fs.existsSync(path.join(__dirname, 'dist', 'songs')),
+    uploadsFiles: [],
+    distFiles: [],
+    mp3Found: [],
+    errors: []
+  }
+
+  // Verificar contenido de uploads/songs
+  if (debug.uploadsExists) {
+    try {
+      debug.uploadsFiles = fs.readdirSync(UPLOADS_DIR)
+      debug.mp3Found = debug.uploadsFiles.filter(f => f.toLowerCase().endsWith('.mp3'))
+    } catch (e) {
+      debug.errors.push(`Error leyendo uploads: ${e.message}`)
+    }
+  } else {
+    debug.errors.push(`Carpeta uploads no existe: ${UPLOADS_DIR}`)
+  }
+
+  // Verificar contenido de dist/songs
+  if (debug.distSongsExists) {
+    try {
+      debug.distFiles = fs.readdirSync(path.join(__dirname, 'dist', 'songs'))
+    } catch (e) {
+      debug.errors.push(`Error leyendo dist/songs: ${e.message}`)
+    }
+  }
+
+  // Verificar index.json de dist
+  const distIndexPath = path.join(__dirname, 'dist', 'songs', 'index.json')
+  if (fs.existsSync(distIndexPath)) {
+    try {
+      debug.distIndexContent = JSON.parse(fs.readFileSync(distIndexPath, 'utf8'))
+    } catch (e) {
+      debug.errors.push(`Error leyendo dist index.json: ${e.message}`)
+    }
+  }
+
+  // Probar que parseFilename funciona
+  if (debug.mp3Found.length > 0) {
+    debug.parsedExample = parseFilename(debug.mp3Found[0])
+  }
+
+  res.json(debug)
+})
+
 // Configurar multer para subir archivos
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {

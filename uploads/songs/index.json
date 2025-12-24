@@ -1,0 +1,12 @@
+{
+  "songs": [
+    {
+      "id": "mock-song",
+      "title": "Mock Song",
+      "artist": "Mock Artist",
+      "audio": "/uploads/songs/mock-song.mp3",
+      "notes": "/uploads/songs/mock-song.json",
+      "bpm": 120
+    }
+  ]
+}

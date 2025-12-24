@@ -1,0 +1,21 @@
+{
+  "song": {
+    "title": "Mock Song",
+    "artist": "Mock Artist"
+  },
+  "notes": [
+    {
+      "time": 0.5,
+      "lane": 2
+    },
+    {
+      "time": 1.5,
+      "lane": 3
+    },
+    {
+      "time": 2.5,
+      "lane": 4
+    }
+  ],
+  "bpm": 130
+}

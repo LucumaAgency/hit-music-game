@@ -1,380 +1,144 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { io } from 'socket.io-client'
+import { useEffect, useCallback } from 'react'
 import './App.css'
-import NoteEditor from './NoteEditor'
 
-const LANES = [
-  { key: 'a', color: '#22c55e' },
-  { key: 's', color: '#ef4444' },
-  { key: 'j', color: '#eab308' },
-  { key: 'k', color: '#3b82f6' },
-  { key: 'l', color: '#f97316' },
-]
+// Contexts
+import { GameProvider, useGame } from './contexts/GameContext'
+import { AudioProvider, useAudio } from './contexts/AudioContext'
+import { MultiplayerProvider, useMultiplayer } from './contexts/MultiplayerContext'
 
-const BASE_NOTE_SPEED = 3
-const HIT_WINDOW = 0.15
-const MIN_TIME_BETWEEN_NOTES = 0.25
-const BASE_BPM = 120 // BPM de referencia para velocidad normal
+// Hooks
+import { useGameLoop } from './hooks/useGameLoop'
+import { useKeyboardInput } from './hooks/useKeyboardInput'
 
-function seededRandom(seed) {
-  const x = Math.sin(seed * 9999) * 10000
-  return x - Math.floor(x)
-}
+// Components
+import Header from './components/ui/Header'
+import HomeScreen from './components/screens/HomeScreen'
+import PreGameScreen from './components/screens/PreGameScreen'
+import ResultsScreen from './components/screens/ResultsScreen'
+import PauseMenu from './components/screens/PauseMenu'
+import RecordingDoneScreen from './components/screens/RecordingDoneScreen'
+import MultiplayerMenu from './components/multiplayer/MultiplayerMenu'
+import MultiplayerLobby from './components/multiplayer/MultiplayerLobby'
+import GameArea from './components/game/GameArea'
+import NoteEditor from './components/NoteEditor'
 
-function detectBPM(audioBuffer) {
-  const channelData = audioBuffer.getChannelData(0)
-  const sampleRate = audioBuffer.sampleRate
+import { downloadJSON } from './utils/helpers'
 
-  // Detectar picos de energía
-  const windowSize = Math.floor(sampleRate * 0.05)
-  const peaks = []
+function AppContent() {
+  const game = useGame()
+  const audio = useAudio()
+  const multiplayer = useMultiplayer()
 
-  for (let i = 0; i < channelData.length; i += windowSize) {
-    const windowEnd = Math.min(i + windowSize, channelData.length)
-    let sum = 0
-    let max = 0
+  const {
+    gameState, setGameState,
+    score, combo, hits, misses, maxCombo,
+    notes, notesRef, activeNotes,
+    isPaused, setIsPaused,
+    isRecording, setIsRecording,
+    recordedNotes, setRecordedNotes, recordedNotesRef,
+    showEditor, setShowEditor,
+    setNotesData, setLoadedFromJson,
+    resetGame, registerMiss, findHitNote, registerHit, recordNote,
+    setPressedKeys,
+  } = game
 
-    for (let j = i; j < windowEnd; j++) {
-      const val = Math.abs(channelData[j])
-      sum += val * val
-      if (val > max) max = val
+  const {
+    selectedSong, setSelectedSong,
+    bpm,
+    noteSpeed, speedMultiplier,
+    audioRef, ytPlayerRef,
+    getCurrentTime, play, pause, seek, stop,
+    reloadSongs,
+  } = audio
+
+  const {
+    isMultiplayer,
+    showMultiplayerMenu,
+    countdown, setCountdown,
+    resumeCountdown, setResumeCountdown,
+    pendingSongLoad, setPendingSongLoad,
+    isHost,
+    sendScoreUpdate, sendGameFinished,
+    exitMultiplayer,
+  } = multiplayer
+
+  // Game end handler
+  const handleGameEnd = useCallback(() => {
+    if (isMultiplayer) {
+      sendGameFinished(score, hits, misses, maxCombo, notesRef.current.length)
     }
+    setGameState('finished')
+  }, [isMultiplayer, score, hits, misses, maxCombo, sendGameFinished, setGameState, notesRef])
 
-    const energy = Math.sqrt(sum / (windowEnd - i))
-    const time = i / sampleRate
-
-    if (energy > 0.3 && max > 0.4) {
-      peaks.push(time)
-    }
-  }
-
-  // Calcular intervalos entre picos
-  const intervals = []
-  for (let i = 1; i < peaks.length; i++) {
-    const interval = peaks[i] - peaks[i - 1]
-    if (interval > 0.2 && interval < 2) { // Entre 30 y 300 BPM
-      intervals.push(interval)
-    }
-  }
-
-  if (intervals.length === 0) return 120 // Default BPM
-
-  // Encontrar el intervalo más común (agrupando en buckets)
-  const buckets = {}
-  intervals.forEach(interval => {
-    const bucket = Math.round(interval * 10) / 10 // Redondear a 0.1s
-    buckets[bucket] = (buckets[bucket] || 0) + 1
+  // Game loop
+  useGameLoop({
+    gameState,
+    isPaused,
+    notesRef,
+    noteSpeed,
+    speedMultiplier,
+    getCurrentTime,
+    setActiveNotes: game.setActiveNotes,
+    registerMiss,
+    onGameEnd: handleGameEnd,
+    selectedSong,
+    ytPlayerRef,
+    audioRef,
   })
 
-  let mostCommonInterval = 0.5 // Default 120 BPM
-  let maxCount = 0
-  Object.entries(buckets).forEach(([interval, count]) => {
-    if (count > maxCount) {
-      maxCount = count
-      mostCommonInterval = parseFloat(interval)
+  // Toggle pause
+  const togglePause = useCallback(() => {
+    if (gameState !== 'playing' && gameState !== 'paused') return
+
+    if (isPaused) {
+      setResumeCountdown(1)
+    } else {
+      pause()
+      setIsPaused(true)
+      setGameState('paused')
     }
+  }, [gameState, isPaused, pause, setIsPaused, setGameState, setResumeCountdown])
+
+  // Escape handler
+  const handleEscape = useCallback(() => {
+    if (isRecording) {
+      stopRecording()
+    } else {
+      backToMenu()
+    }
+  }, [isRecording])
+
+  // Keyboard input
+  useKeyboardInput({
+    gameState,
+    isPaused,
+    isRecording,
+    getCurrentTime,
+    findHitNote,
+    registerHit,
+    recordNote,
+    setPressedKeys,
+    togglePause,
+    onEscape: handleEscape,
+    sendScoreUpdate,
+    isMultiplayer,
+    score,
+    combo,
+    hits,
+    misses,
   })
 
-  // Convertir intervalo a BPM
-  const bpm = Math.round(60 / mostCommonInterval)
-
-  // Limitar a un rango razonable
-  return Math.max(60, Math.min(200, bpm))
-}
-
-function analyzeAudio(audioBuffer) {
-  const channelData = audioBuffer.getChannelData(0)
-  const sampleRate = audioBuffer.sampleRate
-  const notes = []
-  const windowSize = Math.floor(sampleRate * 0.40) // Escanear cada 400ms
-  const threshold = 0.20 // Umbral de energía
-  const minTimeBetweenNotes = 0.20
-
-  let lastNoteTime = -1
-  let noteIndex = 0
-
-  for (let i = 0; i < channelData.length; i += windowSize) {
-    const windowEnd = Math.min(i + windowSize, channelData.length)
-    let sum = 0
-    let max = 0
-
-    for (let j = i; j < windowEnd; j++) {
-      const val = Math.abs(channelData[j])
-      sum += val * val
-      if (val > max) max = val
-    }
-
-    const energy = Math.sqrt(sum / (windowEnd - i))
-    const time = i / sampleRate
-
-    if (energy > threshold && max > 0.30) { // Umbral de amplitud
-      if (time - lastNoteTime >= minTimeBetweenNotes) {
-        const lane = Math.floor(seededRandom(time * 1000 + noteIndex) * 5)
-        notes.push({ time: Math.round(time * 1000) / 1000, lane })
-        lastNoteTime = time
-        noteIndex++
-      }
-    }
-  }
-
-  // Agregar notas extra en huecos grandes (60% probabilidad)
-  const extraNotes = []
-  for (let i = 0; i < notes.length - 1; i++) {
-    const gap = notes[i + 1].time - notes[i].time
-    if (gap > 0.25 && seededRandom(notes[i].time * 777) > 0.4) {
-      const midTime = Math.round((notes[i].time + gap / 2) * 1000) / 1000
-      let lane = Math.floor(seededRandom(midTime * 999) * 5)
-      if (lane === notes[i].lane) {
-        lane = (lane + 1) % 5
-      }
-      extraNotes.push({ time: midTime, lane })
-    }
-  }
-
-  const allNotes = [...notes, ...extraNotes].sort((a, b) => a.time - b.time)
-
-  // Agregar acordes (combinaciones de 2 teclas) - 20% de las notas
-  const notesWithChords = []
-  for (let i = 0; i < allNotes.length; i++) {
-    notesWithChords.push(allNotes[i])
-
-    // 20% probabilidad de agregar una segunda nota al mismo tiempo
-    if (seededRandom(allNotes[i].time * 333 + i) > 0.8) {
-      let secondLane = Math.floor(seededRandom(allNotes[i].time * 555 + i) * 5)
-      // Asegurar que sea diferente carril
-      if (secondLane === allNotes[i].lane) {
-        secondLane = (secondLane + 1) % 5
-      }
-      notesWithChords.push({
-        time: allNotes[i].time,
-        lane: secondLane,
-        isChord: true
-      })
-    }
-  }
-
-  return notesWithChords.sort((a, b) => a.time - b.time)
-}
-
-function downloadJSON(data, filename) {
-  const json = JSON.stringify(data, null, 2)
-  const blob = new Blob([json], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-function App() {
-  const [gameState, setGameState] = useState('idle')
-  const [songs, setSongs] = useState([])
-  const [selectedSong, setSelectedSong] = useState(null)
-  const [customAudioUrl, setCustomAudioUrl] = useState(null)
-  const fileInputRef = useRef(null)
-  const [notes, setNotes] = useState([])
-  const [activeNotes, setActiveNotes] = useState([])
-  const [score, setScore] = useState(0)
-  const [combo, setCombo] = useState(0)
-  const [hits, setHits] = useState(0)
-  const [misses, setMisses] = useState(0)
-  const [feedback, setFeedback] = useState({})
-  const [pressedKeys, setPressedKeys] = useState({})
-  const [maxCombo, setMaxCombo] = useState(0)
-  const [isPaused, setIsPaused] = useState(false)
-  const [volume, setVolume] = useState(0.5)
-  const [loadedFromJson, setLoadedFromJson] = useState(false)
-  const [bpm, setBpm] = useState(120)
-  const [noteSpeed, setNoteSpeed] = useState(BASE_NOTE_SPEED)
-  const [speedMultiplier, setSpeedMultiplier] = useState(1.0)
-
-  // Multiplayer states
-  const [isMultiplayer, setIsMultiplayer] = useState(false)
-  const [showMultiplayerMenu, setShowMultiplayerMenu] = useState(false)
-  const [playerName, setPlayerName] = useState('')
-  const [roomCode, setRoomCode] = useState('')
-  const [roomInput, setRoomInput] = useState('')
-  const [opponent, setOpponent] = useState(null)
-  const [opponentScore, setOpponentScore] = useState(0)
-  const [opponentCombo, setOpponentCombo] = useState(0)
-  const [isHost, setIsHost] = useState(false)
-  const [bothReady, setBothReady] = useState({ host: false, guest: false })
-  const [countdown, setCountdown] = useState(null)
-  const [resumeCountdown, setResumeCountdown] = useState(null)
-  const [opponentFinished, setOpponentFinished] = useState(null)
-  const [multiplayerError, setMultiplayerError] = useState('')
-  const [pendingSongLoad, setPendingSongLoad] = useState(null)
-  const socketRef = useRef(null)
-
-  // YouTube states
-  const [ytPlayerReady, setYtPlayerReady] = useState(false)
-  const [audioOffset, setAudioOffset] = useState(0) // Offset para sincronización
-  const ytPlayerRef = useRef(null)
-  const ytApiLoaded = useRef(false)
-
-  // Upload form states
-  const [uploadYoutubeUrl, setUploadYoutubeUrl] = useState('')
-  const [uploadTitle, setUploadTitle] = useState('')
-  const [uploadArtist, setUploadArtist] = useState('')
-  const [uploadLoading, setUploadLoading] = useState(false)
-  const [uploadError, setUploadError] = useState('')
-
-  // Recording mode states
-  const [isRecording, setIsRecording] = useState(false)
-  const [recordedNotes, setRecordedNotes] = useState([])
-  const recordedNotesRef = useRef([])
-
-  // Editor state
-  const [showEditor, setShowEditor] = useState(false)
-
-  const audioRef = useRef(null)
-  const audioContextRef = useRef(null)
-  const animationRef = useRef(null)
-  const notesRef = useRef([])
-
-  // Cargar lista de canciones al inicio
-  useEffect(() => {
-    fetch('/api/songs')
-      .then(res => res.json())
-      .then(data => setSongs(data.songs || []))
-      .catch(() => {
-        // Fallback a archivo estático si no hay backend
-        fetch('/songs/index.json')
-          .then(res => res.json())
-          .then(data => setSongs(data.songs || []))
-          .catch(() => console.log('No se encontró index.json'))
-      })
-  }, [])
-
-  // Cargar YouTube IFrame API
-  useEffect(() => {
-    if (ytApiLoaded.current) return
-
-    const tag = document.createElement('script')
-    tag.src = 'https://www.youtube.com/iframe_api'
-    const firstScriptTag = document.getElementsByTagName('script')[0]
-    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag)
-
-    window.onYouTubeIframeAPIReady = () => {
-      ytApiLoaded.current = true
-      console.log('YouTube IFrame API loaded')
-    }
-  }, [])
-
-  // Inicializar YouTube player para una canción
-  const initYouTubePlayer = (videoId) => {
-    if (!window.YT || !window.YT.Player) {
-      console.error('YouTube API not loaded')
-      return
-    }
-
-    // Destruir player anterior si existe
-    if (ytPlayerRef.current) {
-      ytPlayerRef.current.destroy()
-      ytPlayerRef.current = null
-    }
-
-    setYtPlayerReady(false)
-
-    ytPlayerRef.current = new window.YT.Player('youtube-player', {
-      height: '200',
-      width: '350',
-      videoId: videoId,
-      playerVars: {
-        autoplay: 0,
-        controls: 0,
-        disablekb: 1,
-        fs: 0,
-        modestbranding: 1,
-        rel: 0
-      },
-      events: {
-        onReady: () => {
-          console.log('YouTube player ready')
-          setYtPlayerReady(true)
-        },
-        onStateChange: (event) => {
-          // YT.PlayerState.ENDED = 0
-          if (event.data === 0) {
-            setGameState('finished')
-          }
-        }
-      }
-    })
-  }
-
-  // Inicializar socket cuando se necesite
-  const initSocket = useCallback(() => {
-    if (socketRef.current) return socketRef.current
-
-    const newSocket = io(window.location.origin)
-    socketRef.current = newSocket
-
-    newSocket.on('roomCreated', ({ roomCode }) => {
-      console.log('Sala creada:', roomCode)
-      setRoomCode(roomCode)
-      setIsHost(true)
-      setGameState('lobby')
-    })
-
-    newSocket.on('joinedRoom', ({ roomCode, hostName }) => {
-      console.log('Unido a sala:', roomCode)
-      setRoomCode(roomCode)
-      setOpponent(hostName)
-      setIsHost(false)
-      setGameState('lobby')
-    })
-
-    newSocket.on('playerJoined', ({ guestName }) => {
-      console.log('Jugador unido:', guestName)
-      setOpponent(guestName)
-    })
-
-    newSocket.on('error', (msg) => {
-      console.log('Error:', msg)
-      setMultiplayerError(msg)
-    })
-
-    newSocket.on('songSelected', (song) => {
-      setSelectedSong(song)
-      setPendingSongLoad(song)
-    })
-
-    newSocket.on('readyUpdate', ({ hostReady, guestReady }) => {
-      setBothReady({ host: hostReady, guest: guestReady })
-    })
-
-    newSocket.on('startCountdown', () => {
-      setCountdown(3)
-    })
-
-    newSocket.on('opponentUpdate', ({ score, combo }) => {
-      setOpponentScore(score)
-      setOpponentCombo(combo)
-    })
-
-    newSocket.on('opponentFinished', (data) => {
-      setOpponentFinished(data)
-    })
-
-    newSocket.on('playerDisconnected', () => {
-      setMultiplayerError('El oponente se desconectó')
-      setOpponent(null)
-    })
-
-    return newSocket
-  }, [])
-
-  // Guest auto-load song when host selects it
+  // Guest auto-load song
   useEffect(() => {
     if (pendingSongLoad && isMultiplayer && !isHost) {
-      loadSong(pendingSongLoad)
+      audio.loadSong(pendingSongLoad, setGameState, setNotesData).then(result => {
+        if (result?.success) setLoadedFromJson(result.fromJson)
+      })
       setPendingSongLoad(null)
     }
   }, [pendingSongLoad, isMultiplayer, isHost])
 
-  // Countdown timer (multiplayer)
+  // Countdown timer
   useEffect(() => {
     if (countdown === null) return
     if (countdown === 0) {
@@ -386,264 +150,58 @@ function App() {
     return () => clearTimeout(timer)
   }, [countdown])
 
-  // Resume countdown timer (after unpause)
+  // Resume countdown
   useEffect(() => {
     if (resumeCountdown === null) return
     if (resumeCountdown === 0) {
       setResumeCountdown(null)
-      // Actually resume the game
-      if (selectedSong?.type === 'youtube' && ytPlayerRef.current) {
-        ytPlayerRef.current.playVideo()
-      } else if (audioRef.current) {
-        audioRef.current.play()
-      }
+      play()
       setIsPaused(false)
       setGameState('playing')
       return
     }
     const timer = setTimeout(() => setResumeCountdown(resumeCountdown - 1), 1000)
     return () => clearTimeout(timer)
-  }, [resumeCountdown, selectedSong])
+  }, [resumeCountdown])
 
-  // Manejar subida de MP3 con formulario completo
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-
-    const fileName = file.name.replace('.mp3', '').replace(/[^a-zA-Z0-9 ]/g, ' ').trim()
-
-    // Si no hay título, usar nombre del archivo
-    const title = uploadTitle.trim() || fileName
-    const artist = uploadArtist.trim() || 'Desconocido'
-
-    setUploadLoading(true)
-    setUploadError('')
-    setGameState('analyzing')
-
-    try {
-      // Subir al servidor para análisis
-      const formData = new FormData()
-      formData.append('audio', file)
-      formData.append('title', title)
-      formData.append('artist', artist)
-      if (uploadYoutubeUrl.trim()) {
-        formData.append('youtubeUrl', uploadYoutubeUrl.trim())
-      }
-
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      })
-
-      if (!response.ok) {
-        const err = await response.json()
-        throw new Error(err.error || 'Error del servidor')
-      }
-
-      const result = await response.json()
-      console.log('Canción guardada:', result)
-
-      // Recargar lista de canciones
-      const songsRes = await fetch('/api/songs')
-      if (songsRes.ok) {
-        const data = await songsRes.json()
-        setSongs(data.songs || [])
-      }
-
-      // Limpiar formulario
-      setUploadTitle('')
-      setUploadArtist('')
-      setUploadYoutubeUrl('')
-
-      // Cargar la canción recién subida
-      if (result.song) {
-        loadSong(result.song)
-      }
-
-      alert(`Canción "${title}" agregada correctamente!`)
-
-    } catch (error) {
-      console.error('Error subiendo canción:', error)
-      setUploadError(error.message)
-      setGameState('idle')
-    } finally {
-      setUploadLoading(false)
-    }
-  }
-
-  // Cargar canción seleccionada
-  const loadSong = async (song) => {
-    setSelectedSong(song)
-    setGameState('analyzing')
-
-    // Si es canción de YouTube
-    if (song.type === 'youtube' && song.videoId) {
-      try {
-        const notesPath = song.notes
-        const jsonResponse = await fetch(`${notesPath}?t=${Date.now()}`)
-
-        if (!jsonResponse.ok) {
-          throw new Error('No se encontraron las notas')
-        }
-
-        const songData = await jsonResponse.json()
-        const loadedNotes = songData.notes || songData
-        const loadedBpm = songData.bpm || 120
-
-        setBpm(loadedBpm)
-        const speed = BASE_NOTE_SPEED * (loadedBpm / BASE_BPM)
-        setNoteSpeed(Math.max(2, Math.min(5, speed)))
-
-        setNotes(loadedNotes)
-        notesRef.current = loadedNotes.map((n, i) => ({ ...n, id: i, hit: false, missed: false }))
-        setLoadedFromJson(true)
-
-        // Inicializar YouTube player
-        initYouTubePlayer(song.videoId)
-        setGameState('ready')
-        return
-
-      } catch (error) {
-        console.error('Error cargando canción YouTube:', error)
-        setGameState('idle')
-        return
-      }
-    }
-
-    // Canciones normales (MP3)
-    const audioPath = song.audio.startsWith('/') ? song.audio : `/songs/${song.audio}`
-    const notesPath = song.notes.startsWith('/') ? song.notes : `/songs/${song.notes}`
-
-    // Actualizar src del audio
-    if (audioRef.current) {
-      audioRef.current.src = audioPath
-    }
-
-    // Intentar cargar notas del JSON (con cache-busting)
-    try {
-      const jsonResponse = await fetch(`${notesPath}?t=${Date.now()}`)
-      if (jsonResponse.ok) {
-        const songData = await jsonResponse.json()
-        const loadedNotes = songData.notes || songData
-        const loadedBpm = songData.bpm || 120
-
-        setBpm(loadedBpm)
-        const speed = BASE_NOTE_SPEED * (loadedBpm / BASE_BPM)
-        setNoteSpeed(Math.max(2, Math.min(5, speed)))
-
-        setNotes(loadedNotes)
-        notesRef.current = loadedNotes.map((n, i) => ({ ...n, id: i, hit: false, missed: false }))
-        setLoadedFromJson(true)
-        setGameState('ready')
-        return
-      }
-    } catch (e) {
-      console.log('No se encontró JSON, analizando audio...')
-    }
-
-    // Si no hay JSON, analizar el audio
-    try {
-      const response = await fetch(audioPath)
-      const arrayBuffer = await response.arrayBuffer()
-
-      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)()
-      const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer)
-
-      const generatedNotes = analyzeAudio(audioBuffer)
-      const detectedBpm = detectBPM(audioBuffer)
-      setBpm(detectedBpm)
-
-      const speed = BASE_NOTE_SPEED * (detectedBpm / BASE_BPM)
-      setNoteSpeed(Math.max(2, Math.min(5, speed)))
-
-      setNotes(generatedNotes)
-      notesRef.current = generatedNotes.map((n, i) => ({ ...n, id: i, hit: false, missed: false }))
-
-      // Descargar JSON
-      const songData = {
-        song: { title: song.title, artist: song.artist, audioFile: song.audio, bpm: detectedBpm },
-        notes: generatedNotes,
-        bpm: detectedBpm
-      }
-      downloadJSON(songData, song.notes)
-
-      setLoadedFromJson(false)
-      setGameState('ready')
-    } catch (error) {
-      console.error('Error cargando audio:', error)
-      setGameState('idle')
-    }
-  }
-
-  const startGame = () => {
+  // Start game
+  const startGame = useCallback(() => {
     if (gameState !== 'ready' && gameState !== 'finished') return
 
-    setScore(0)
-    setCombo(0)
-    setMaxCombo(0)
-    setHits(0)
-    setMisses(0)
-    setActiveNotes([])
-    setFeedback({})
-    notesRef.current = notesRef.current.map(n => ({ ...n, hit: false, missed: false }))
-
-    // YouTube o MP3
-    if (selectedSong?.type === 'youtube' && ytPlayerRef.current) {
-      ytPlayerRef.current.seekTo(0)
-      ytPlayerRef.current.setVolume(volume * 100)
-      ytPlayerRef.current.playVideo()
-    } else if (audioRef.current) {
-      audioRef.current.currentTime = 0
-      audioRef.current.volume = volume
-      audioRef.current.play()
-    }
-
+    resetGame()
+    seek(0)
+    play()
     setIsPaused(false)
     setIsRecording(false)
     setGameState('playing')
-  }
+  }, [gameState, resetGame, seek, play, setIsPaused, setIsRecording, setGameState])
 
-  // Iniciar modo grabación
-  const startRecording = () => {
+  // Start recording
+  const startRecording = useCallback(() => {
     if (gameState !== 'ready' && gameState !== 'finished') return
 
-    // Limpiar notas grabadas anteriores
     setRecordedNotes([])
     recordedNotesRef.current = []
-    setActiveNotes([])
-    setFeedback({})
+    game.setActiveNotes([])
+    game.setFeedback({})
 
-    // Iniciar audio
-    if (selectedSong?.type === 'youtube' && ytPlayerRef.current) {
-      ytPlayerRef.current.seekTo(0)
-      ytPlayerRef.current.setVolume(volume * 100)
-      ytPlayerRef.current.playVideo()
-    } else if (audioRef.current) {
-      audioRef.current.currentTime = 0
-      audioRef.current.volume = volume
-      audioRef.current.play()
-    }
-
+    seek(0)
+    play()
     setIsPaused(false)
     setIsRecording(true)
     setGameState('playing')
-  }
+  }, [gameState, seek, play, setIsPaused, setIsRecording, setGameState, setRecordedNotes, recordedNotesRef])
 
-  // Detener grabación y mostrar resultado
-  const stopRecording = () => {
-    if (selectedSong?.type === 'youtube' && ytPlayerRef.current) {
-      ytPlayerRef.current.pauseVideo()
-    } else if (audioRef.current) {
-      audioRef.current.pause()
-    }
-
+  // Stop recording
+  const stopRecording = useCallback(() => {
+    pause()
     setRecordedNotes([...recordedNotesRef.current])
     setIsRecording(false)
     setGameState('recording-done')
-  }
+  }, [pause, setRecordedNotes, recordedNotesRef, setIsRecording, setGameState])
 
-  // Guardar notas grabadas en el servidor
-  const saveRecordedNotes = async () => {
+  // Save recorded notes
+  const saveRecordedNotes = useCallback(async () => {
     if (recordedNotes.length === 0) {
       alert('No hay notas grabadas')
       return
@@ -651,30 +209,20 @@ function App() {
 
     try {
       const notesData = {
-        song: {
-          title: selectedSong.title,
-          artist: selectedSong.artist,
-          bpm: bpm
-        },
+        song: { title: selectedSong.title, artist: selectedSong.artist, bpm },
         notes: recordedNotes.sort((a, b) => a.time - b.time),
-        bpm: bpm
+        bpm,
       }
 
-      // Guardar via API
       const response = await fetch('/api/save-notes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          songId: selectedSong.id,
-          notesData
-        })
+        body: JSON.stringify({ songId: selectedSong.id, notesData })
       })
 
       if (response.ok) {
-        alert(`¡${recordedNotes.length} notas guardadas!`)
-        // Actualizar las notas de la canción actual
-        setNotes(recordedNotes)
-        notesRef.current = recordedNotes.map((n, i) => ({ ...n, id: i, hit: false, missed: false }))
+        alert(`${recordedNotes.length} notas guardadas!`)
+        setNotesData(recordedNotes)
         setLoadedFromJson(true)
         setGameState('ready')
       } else {
@@ -683,306 +231,45 @@ function App() {
     } catch (error) {
       console.error('Error:', error)
       alert('Error guardando notas. Descargando JSON...')
-      // Fallback: descargar JSON
       const notesData = {
         song: { title: selectedSong.title, artist: selectedSong.artist, bpm },
         notes: recordedNotes.sort((a, b) => a.time - b.time),
-        bpm
+        bpm,
       }
       downloadJSON(notesData, `${selectedSong.id || 'recorded'}-notes.json`)
     }
-  }
+  }, [recordedNotes, selectedSong, bpm, setNotesData, setLoadedFromJson, setGameState])
 
-  const togglePause = useCallback(() => {
-    if (gameState !== 'playing' && gameState !== 'paused') return
-
-    if (isPaused) {
-      // Resume with countdown
-      setResumeCountdown(1) // 1 segundo de espera
-    } else {
-      // Pause
-      if (selectedSong?.type === 'youtube' && ytPlayerRef.current) {
-        ytPlayerRef.current.pauseVideo()
-      } else if (audioRef.current) {
-        audioRef.current.pause()
-      }
-      setIsPaused(true)
-      setGameState('paused')
-    }
-  }, [gameState, isPaused, selectedSong])
-
-  const handleVolumeChange = (e) => {
-    const newVolume = parseFloat(e.target.value)
-    setVolume(newVolume)
-    if (selectedSong?.type === 'youtube' && ytPlayerRef.current) {
-      ytPlayerRef.current.setVolume(newVolume * 100)
-    } else if (audioRef.current) {
-      audioRef.current.volume = newVolume
-    }
-  }
-
-  // Funciones Multiplayer
-  const createRoom = () => {
-    if (!playerName.trim()) {
-      setMultiplayerError('Ingresa tu nombre')
-      return
-    }
-    setMultiplayerError('')
-    setIsMultiplayer(true)
-    const socket = initSocket()
-    socket.emit('createRoom', playerName)
-  }
-
-  const joinRoom = () => {
-    if (!playerName.trim()) {
-      setMultiplayerError('Ingresa tu nombre')
-      return
-    }
-    if (!roomInput.trim()) {
-      setMultiplayerError('Ingresa el código de sala')
-      return
-    }
-    setMultiplayerError('')
-    setIsMultiplayer(true)
-    const socket = initSocket()
-    socket.emit('joinRoom', { roomCode: roomInput.toUpperCase(), playerName })
-  }
-
-  const selectSongMultiplayer = (song) => {
-    if (socketRef.current && isHost) {
-      socketRef.current.emit('selectSong', song)
-    }
-    loadSong(song)
-  }
-
-  const setReady = () => {
-    if (socketRef.current) {
-      socketRef.current.emit('playerReady')
-    }
-  }
-
-  const exitMultiplayer = () => {
-    if (socketRef.current) {
-      socketRef.current.disconnect()
-      socketRef.current = null
-    }
-    setIsMultiplayer(false)
-    setShowMultiplayerMenu(false)
-    setRoomCode('')
-    setOpponent(null)
-    setOpponentScore(0)
-    setOpponentCombo(0)
-    setBothReady({ host: false, guest: false })
-    setCountdown(null)
-    setOpponentFinished(null)
-    setMultiplayerError('')
-    setGameState('idle')
-  }
-
-  const backToMenu = async () => {
-    // Detener YouTube player si existe
-    if (ytPlayerRef.current) {
-      try {
-        ytPlayerRef.current.stopVideo()
-        ytPlayerRef.current.destroy()
-        ytPlayerRef.current = null
-      } catch (e) {}
-    }
-    setYtPlayerReady(false)
-
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current.currentTime = 0
-    }
-    // Limpiar URL temporal si existe
-    if (customAudioUrl) {
-      URL.revokeObjectURL(customAudioUrl)
-      setCustomAudioUrl(null)
-    }
+  // Back to menu
+  const backToMenu = useCallback(async () => {
+    stop()
     setSelectedSong(null)
     setGameState('idle')
-    setNotes([])
-    setActiveNotes([])
+    setNotesData([])
+    game.setActiveNotes([])
+    await reloadSongs()
+  }, [stop, setSelectedSong, setGameState, setNotesData, reloadSongs])
 
-    // Recargar lista de canciones
-    try {
-      const res = await fetch('/api/songs')
-      if (res.ok) {
-        const data = await res.json()
-        setSongs(data.songs || [])
-      }
-    } catch (e) {
-      console.log('Error recargando canciones')
+  // Exit multiplayer wrapper
+  const handleExitMultiplayer = useCallback(() => {
+    exitMultiplayer(setGameState)
+  }, [exitMultiplayer, setGameState])
+
+  // Editor save handler
+  const handleEditorSave = useCallback((editedNotes) => {
+    if (gameState === 'recording-done') {
+      setRecordedNotes(editedNotes)
+    } else {
+      setNotesData(editedNotes)
     }
-  }
-
-  // Helper para obtener tiempo actual (YouTube o Audio)
-  const getCurrentTime = useCallback(() => {
-    if (selectedSong?.type === 'youtube' && ytPlayerRef.current) {
-      try {
-        return ytPlayerRef.current.getCurrentTime() + audioOffset
-      } catch (e) {
-        return 0
-      }
-    }
-    return audioRef.current?.currentTime || 0
-  }, [selectedSong, audioOffset])
-
-  const gameLoop = useCallback(() => {
-    // Verificar que tenemos un reproductor activo
-    const isYouTube = selectedSong?.type === 'youtube'
-    if (!isYouTube && !audioRef.current) return
-    if (isYouTube && !ytPlayerRef.current) return
-
-    const currentTime = getCurrentTime()
-
-    const effectiveSpeed = noteSpeed / (1 + (speedMultiplier - 1) * 0.5) // Cambio gradual de velocidad
-    const visibleNotes = notesRef.current.filter(note => {
-      const noteScreenTime = note.time - currentTime
-      return noteScreenTime <= effectiveSpeed && noteScreenTime >= -0.5 && !note.hit
-    })
-
-    notesRef.current.forEach(note => {
-      if (!note.hit && !note.missed && currentTime > note.time + HIT_WINDOW) {
-        note.missed = true
-        setMisses(m => m + 1)
-        setCombo(0)
-        setFeedback(prev => ({ ...prev, [note.lane]: { type: 'miss', time: Date.now() } }))
-      }
-    })
-
-    setActiveNotes([...visibleNotes])
-
-    // Verificar si terminó (YouTube se maneja con onStateChange, pero también chequeamos aquí)
-    const isEnded = isYouTube
-      ? (ytPlayerRef.current?.getPlayerState?.() === 0) // YT.PlayerState.ENDED
-      : audioRef.current?.ended
-
-    if (isEnded) {
-      // Emit final results in multiplayer
-      if (socketRef.current && isMultiplayer) {
-        socketRef.current.emit('gameFinished', {
-          score,
-          hits,
-          misses,
-          maxCombo,
-          total: notesRef.current.length
-        })
-      }
-      setGameState('finished')
-      return
-    }
-
-    animationRef.current = requestAnimationFrame(gameLoop)
-  }, [noteSpeed, speedMultiplier, score, hits, misses, maxCombo, isMultiplayer, selectedSong, getCurrentTime])
-
-  useEffect(() => {
-    if (gameState === 'playing' && !isPaused) {
-      animationRef.current = requestAnimationFrame(gameLoop)
-    }
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current)
-      }
-    }
-  }, [gameState, gameLoop, isPaused])
-
-  useEffect(() => {
-    if (combo > maxCombo) {
-      setMaxCombo(combo)
-    }
-  }, [combo, maxCombo])
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      const key = e.key.toLowerCase()
-
-      if (key === 'p') {
-        togglePause()
-        return
-      }
-
-      if (key === 'escape') {
-        if (isRecording) {
-          stopRecording()
-        } else {
-          backToMenu()
-        }
-        return
-      }
-
-      const laneIndex = LANES.findIndex(l => l.key === key)
-
-      if (laneIndex === -1) return
-      if (e.repeat) return
-
-      setPressedKeys(prev => ({ ...prev, [key]: true }))
-
-      if (gameState !== 'playing' || isPaused) return
-
-      // Usar getCurrentTime que maneja tanto YouTube como audio normal
-      const currentTime = getCurrentTime()
-
-      // Modo grabación: registrar la nota
-      if (isRecording) {
-        const newNote = {
-          time: Math.round(currentTime * 1000) / 1000, // Redondear a 3 decimales
-          lane: laneIndex
-        }
-        recordedNotesRef.current.push(newNote)
-        setFeedback(prev => ({ ...prev, [laneIndex]: { type: 'hit', time: Date.now() } }))
-        return
-      }
-
-      // Modo normal: verificar hits
-      const hitNote = notesRef.current.find(note =>
-        note.lane === laneIndex &&
-        !note.hit &&
-        !note.missed &&
-        Math.abs(note.time - currentTime) <= HIT_WINDOW
-      )
-
-      if (hitNote) {
-        hitNote.hit = true
-        const newHits = hits + 1
-        const newCombo = combo + 1
-        const newScore = score + 100 * (1 + Math.floor(newCombo / 10))
-        setHits(newHits)
-        setCombo(newCombo)
-        setScore(newScore)
-        setFeedback(prev => ({ ...prev, [laneIndex]: { type: 'hit', time: Date.now() } }))
-
-        // Enviar actualización multiplayer
-        if (socketRef.current && isMultiplayer) {
-          socketRef.current.emit('scoreUpdate', { score: newScore, combo: newCombo, hits: newHits, misses })
-        }
-      }
-    }
-
-    const handleKeyUp = (e) => {
-      const key = e.key.toLowerCase()
-      setPressedKeys(prev => ({ ...prev, [key]: false }))
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    window.addEventListener('keyup', handleKeyUp)
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-      window.removeEventListener('keyup', handleKeyUp)
-    }
-  }, [gameState, combo, togglePause, isPaused, getCurrentTime, isRecording])
-
-  // Tiempo actual para renderizar notas
-  const currentTime = selectedSong?.type === 'youtube' && ytPlayerRef.current
-    ? (ytPlayerRef.current.getCurrentTime?.() || 0) + audioOffset
-    : (audioRef.current?.currentTime || 0)
+    setShowEditor(false)
+  }, [gameState, setRecordedNotes, setNotesData, setShowEditor])
 
   return (
     <div className="app">
       <audio ref={audioRef} />
 
-      {/* YouTube Player Container - siempre presente pero oculto cuando no se usa */}
+      {/* YouTube Player Container */}
       <div
         id="youtube-player-container"
         className={`youtube-player-container ${selectedSong?.type === 'youtube' && (gameState === 'playing' || gameState === 'paused') ? 'visible' : ''}`}
@@ -990,272 +277,24 @@ function App() {
         <div id="youtube-player"></div>
       </div>
 
-      <div className="header">
-        <h1>Guitar Flash Clone</h1>
-        <div className="stats">
-          <span>Score: {score}</span>
-          <span>Combo: {combo}x</span>
-          <span>Hits: {hits}</span>
-          <span>Miss: {misses}</span>
-          <span>BPM: {bpm}</span>
-          {isMultiplayer && opponent && (
-            <span className="opponent-score">VS {opponent}: {opponentScore} ({opponentCombo}x)</span>
-          )}
-        </div>
-        <div className="controls">
-          <label className="volume-control">
-            Vol
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={volume}
-              onChange={handleVolumeChange}
-            />
-          </label>
-          <label className="speed-control">
-            Velocidad
-            <select
-              value={speedMultiplier}
-              onChange={(e) => setSpeedMultiplier(parseFloat(e.target.value))}
-            >
-              <option value="0.5">0.5x</option>
-              <option value="0.75">0.75x</option>
-              <option value="1">1x</option>
-              <option value="1.5">1.5x</option>
-              <option value="2">2x</option>
-              <option value="2.5">2.5x</option>
-              <option value="3">3x</option>
-              <option value="4">4x</option>
-              <option value="5">5x</option>
-              <option value="6">6x</option>
-              <option value="7">7x</option>
-              <option value="8">8x</option>
-              <option value="9">9x</option>
-              <option value="10">10x</option>
-            </select>
-          </label>
-          <span className="pause-hint">P = Pausa | ESC = Menu</span>
-        </div>
-      </div>
+      <Header />
 
+      {/* Home Screen */}
       {gameState === 'idle' && !selectedSong && !isMultiplayer && !showMultiplayerMenu && (
-        <div className="home-container">
-          {/* Header */}
-          <div className="home-header">
-            <h1>Guitar Flash Clone</h1>
-            <p>Selecciona una canción y demuestra tu habilidad</p>
-          </div>
-
-          {/* Actions Row */}
-          <div className="actions-row">
-            <div className="action-card upload">
-              <h3>Subir Nueva Canción</h3>
-              <div className="action-form">
-                <input
-                  type="text"
-                  placeholder="Título"
-                  value={uploadTitle}
-                  onChange={(e) => setUploadTitle(e.target.value)}
-                  className="action-input"
-                  disabled={uploadLoading}
-                />
-                <input
-                  type="text"
-                  placeholder="Artista"
-                  value={uploadArtist}
-                  onChange={(e) => setUploadArtist(e.target.value)}
-                  className="action-input"
-                  disabled={uploadLoading}
-                />
-                <input
-                  type="text"
-                  placeholder="URL YouTube (opcional)"
-                  value={uploadYoutubeUrl}
-                  onChange={(e) => setUploadYoutubeUrl(e.target.value)}
-                  className="action-input youtube"
-                  disabled={uploadLoading}
-                />
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  accept=".mp3,audio/mpeg"
-                  onChange={handleFileUpload}
-                  style={{ display: 'none' }}
-                />
-                <button
-                  className="action-btn primary"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadLoading}
-                >
-                  {uploadLoading ? 'Subiendo...' : 'Seleccionar MP3'}
-                </button>
-                <p className="action-hint">El audio será analizado automáticamente</p>
-                {uploadError && <p className="error-msg">{uploadError}</p>}
-              </div>
-            </div>
-
-            <div className="action-card multiplayer">
-              <h3>Modo Multijugador</h3>
-              <p className="action-desc">Compite contra otros jugadores en tiempo real</p>
-              <button
-                className="action-btn purple"
-                onClick={() => setShowMultiplayerMenu(true)}
-              >
-                Crear o Unirse a Sala
-              </button>
-            </div>
-          </div>
-
-          {/* Keys Hint */}
-          <div className="keys-hint">
-            <p>Usa estas teclas para jugar:</p>
-            <div className="keys-row">
-              <div className="key-display green">A</div>
-              <div className="key-display red">S</div>
-              <div className="key-display yellow">J</div>
-              <div className="key-display blue">K</div>
-              <div className="key-display orange">L</div>
-            </div>
-          </div>
-
-          {/* Songs Section */}
-          <div className="songs-section">
-            <h2 className="section-title">Canciones Disponibles</h2>
-            <div className="songs-grid">
-              {songs.map(song => (
-                <div
-                  key={song.id}
-                  className={`song-card ${song.type === 'youtube' ? 'youtube' : ''}`}
-                  onClick={() => loadSong(song)}
-                >
-                  {song.type === 'youtube' && <span className="yt-badge">YouTube</span>}
-                  <div className="song-icon">{song.type === 'youtube' ? '🎸' : '🎵'}</div>
-                  <div className="song-title">{song.title}</div>
-                  <div className="song-artist">{song.artist}</div>
-                  <div className="song-meta">
-                    <span>{song.bpm ? `${song.bpm} BPM` : ''}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <HomeScreen />
       )}
 
-      {/* Submenú Multiplayer */}
+      {/* Multiplayer Menu */}
       {showMultiplayerMenu && !isMultiplayer && (
-        <div className="menu">
-          <h2>🎮 Multijugador</h2>
-
-          <div className="multiplayer-section">
-            <input
-              type="text"
-              placeholder="Tu nombre"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              className="multiplayer-input"
-            />
-
-            <button className="multiplayer-btn create" onClick={createRoom}>
-              Crear Sala
-            </button>
-
-            <div className="join-divider">
-              <span>o únete a una sala</span>
-            </div>
-
-            <div className="join-section">
-              <input
-                type="text"
-                placeholder="Código de sala"
-                value={roomInput}
-                onChange={(e) => setRoomInput(e.target.value.toUpperCase())}
-                className="room-code-input"
-                maxLength={6}
-              />
-              <button className="multiplayer-btn join" onClick={joinRoom}>
-                Unirse
-              </button>
-            </div>
-
-            {multiplayerError && <p className="error-msg">{multiplayerError}</p>}
-          </div>
-
-          <button className="back-button" onClick={() => setShowMultiplayerMenu(false)}>
-            Volver
-          </button>
-        </div>
+        <MultiplayerMenu />
       )}
 
+      {/* Multiplayer Lobby */}
       {(['lobby', 'analyzing', 'ready'].includes(gameState)) && isMultiplayer && (
-        <div className="menu lobby">
-          <h2>Sala: {roomCode}</h2>
-          <div className="players-list">
-            <div className="player-item">
-              <span className="player-name">{playerName} (Tú){isHost ? ' - Host' : ''}</span>
-              <span className={`ready-status ${isHost ? (bothReady.host ? 'ready' : '') : (bothReady.guest ? 'ready' : '')}`}>
-                {(isHost ? bothReady.host : bothReady.guest) ? 'LISTO' : 'Esperando...'}
-              </span>
-            </div>
-            {opponent ? (
-              <div className="player-item">
-                <span className="player-name">{opponent}{!isHost ? ' - Host' : ''}</span>
-                <span className={`ready-status ${!isHost ? (bothReady.host ? 'ready' : '') : (bothReady.guest ? 'ready' : '')}`}>
-                  {(!isHost ? bothReady.host : bothReady.guest) ? 'LISTO' : 'Esperando...'}
-                </span>
-              </div>
-            ) : (
-              <div className="player-item waiting">
-                <span>Esperando oponente...</span>
-              </div>
-            )}
-          </div>
-
-          {isHost && opponent && gameState !== 'analyzing' && (
-            <>
-              <h3>Selecciona Canción:</h3>
-              <div className="song-list">
-                {songs.map(song => (
-                  <button
-                    key={song.id}
-                    className={`song-button ${selectedSong?.id === song.id ? 'selected' : ''}`}
-                    onClick={() => selectSongMultiplayer(song)}
-                  >
-                    <span className="song-title">{song.title}</span>
-                    <span className="song-artist">{song.artist}</span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-
-          {selectedSong && (
-            <p className="song-info">Canción: {selectedSong.title} - {selectedSong.artist}</p>
-          )}
-
-          {gameState === 'analyzing' && (
-            <>
-              <p>Cargando canción...</p>
-              <div className="loader"></div>
-            </>
-          )}
-
-          {selectedSong && gameState === 'ready' && (
-            <button className="ready-button" onClick={setReady}>
-              {(isHost ? bothReady.host : bothReady.guest) ? 'Esperando al otro...' : 'LISTO!'}
-            </button>
-          )}
-
-          {countdown !== null && (
-            <div className="countdown">{countdown}</div>
-          )}
-
-          <button className="back-button" onClick={exitMultiplayer}>Salir</button>
-        </div>
+        <MultiplayerLobby onExitMultiplayer={handleExitMultiplayer} />
       )}
 
+      {/* Analyzing */}
       {gameState === 'analyzing' && !isMultiplayer && (
         <div className="menu">
           <h2>Analizando audio...</h2>
@@ -1263,194 +302,68 @@ function App() {
         </div>
       )}
 
+      {/* Pre-game Screen */}
       {gameState === 'ready' && !isMultiplayer && !showEditor && (
-        <div className="menu">
-          <h2>Listo!</h2>
-          <p className="song-info">{selectedSong?.title} - {selectedSong?.artist}</p>
-          <p>{notes.length} notas {loadedFromJson ? 'cargadas' : 'generadas'} | {bpm} BPM</p>
-          <div className="ready-buttons">
-            <button onClick={startGame}>Jugar</button>
-            <button className="record-button" onClick={startRecording}>Grabar Notas</button>
-            <button className="edit-button" onClick={() => setShowEditor(true)}>Editar Notas</button>
-          </div>
-          <button className="back-button" onClick={backToMenu}>Volver</button>
-        </div>
+        <PreGameScreen
+          onStartGame={startGame}
+          onStartRecording={startRecording}
+          onBackToMenu={backToMenu}
+        />
       )}
 
-      {/* Pantalla de resultado de grabación */}
+      {/* Recording Done Screen */}
       {gameState === 'recording-done' && !showEditor && (
-        <div className="menu">
-          <h2>Grabacion Terminada</h2>
-          <p className="song-info">{selectedSong?.title} - {selectedSong?.artist}</p>
-          <p className="recording-count">{recordedNotes.length} notas grabadas</p>
-          <div className="ready-buttons">
-            <button onClick={saveRecordedNotes}>Guardar Notas</button>
-            <button onClick={() => setShowEditor(true)}>Editar Notas</button>
-            <button onClick={startRecording}>Grabar de Nuevo</button>
-          </div>
-          <button className="back-button" onClick={backToMenu}>Descartar y Volver</button>
-        </div>
+        <RecordingDoneScreen
+          onSaveNotes={saveRecordedNotes}
+          onStartRecording={startRecording}
+          onBackToMenu={backToMenu}
+        />
       )}
 
+      {/* Note Editor */}
       {showEditor && (
         <NoteEditor
           notes={gameState === 'recording-done' ? recordedNotes : notes}
           song={selectedSong}
           audioRef={audioRef}
           ytPlayerRef={ytPlayerRef}
-          onSave={(editedNotes) => {
-            if (gameState === 'recording-done') {
-              setRecordedNotes(editedNotes)
-            } else {
-              setNotes(editedNotes)
-              notesRef.current = editedNotes.map((n, i) => ({ ...n, id: i, hit: false, missed: false }))
-            }
-            setShowEditor(false)
-          }}
+          onSave={handleEditorSave}
           onCancel={() => setShowEditor(false)}
         />
       )}
 
+      {/* Pause Menu */}
       {gameState === 'paused' && (
-        <div className="menu pause-menu">
-          {resumeCountdown !== null ? (
-            <>
-              <div className="resume-countdown">{resumeCountdown}</div>
-              <p>Preparate...</p>
-            </>
-          ) : (
-            <>
-              <h2>PAUSA</h2>
-              <p>Presiona P para continuar</p>
-              <button onClick={togglePause}>Continuar</button>
-              <button className="back-button" onClick={backToMenu}>Salir al Menu</button>
-            </>
-          )}
-        </div>
+        <PauseMenu
+          onResume={togglePause}
+          onBackToMenu={backToMenu}
+        />
       )}
 
+      {/* Results Screen */}
       {gameState === 'finished' && (
-        <div className="menu results">
-          {isMultiplayer ? (
-            <>
-              <h2>Resultados</h2>
-              <div className="multiplayer-results">
-                <div className={`player-result ${score > (opponentFinished?.score || 0) ? 'winner' : score < (opponentFinished?.score || 0) ? 'loser' : ''}`}>
-                  <h3>{playerName} (Tú)</h3>
-                  <p className="result-score">{score}</p>
-                  <p>Hits: {hits} / {notes.length}</p>
-                  <p>Precisión: {notes.length > 0 ? Math.round((hits / notes.length) * 100) : 0}%</p>
-                  <p>Max Combo: {maxCombo}x</p>
-                </div>
-                {opponentFinished ? (
-                  <div className={`player-result ${opponentFinished.score > score ? 'winner' : opponentFinished.score < score ? 'loser' : ''}`}>
-                    <h3>{opponent}</h3>
-                    <p className="result-score">{opponentFinished.score}</p>
-                    <p>Hits: {opponentFinished.hits} / {opponentFinished.total || notes.length}</p>
-                    <p>Precisión: {(opponentFinished.total || notes.length) > 0 ? Math.round((opponentFinished.hits / (opponentFinished.total || notes.length)) * 100) : 0}%</p>
-                    <p>Max Combo: {opponentFinished.maxCombo}x</p>
-                  </div>
-                ) : (
-                  <div className="player-result waiting">
-                    <h3>{opponent}</h3>
-                    <p>Esperando...</p>
-                    <div className="loader"></div>
-                  </div>
-                )}
-              </div>
-              {opponentFinished && (
-                <div className="winner-announcement">
-                  {score > opponentFinished.score ? (
-                    <h2 className="you-win">¡GANASTE!</h2>
-                  ) : score < opponentFinished.score ? (
-                    <h2 className="you-lose">Perdiste</h2>
-                  ) : (
-                    <h2 className="tie">¡Empate!</h2>
-                  )}
-                </div>
-              )}
-              <button className="back-button" onClick={exitMultiplayer}>Volver al Menu</button>
-            </>
-          ) : (
-            <>
-              <h2>Cancion Terminada!</h2>
-              <div className="final-stats">
-                <p>Score Final: <strong>{score}</strong></p>
-                <p>Hits: {hits} / {notes.length}</p>
-                <p>Precision: {notes.length > 0 ? Math.round((hits / notes.length) * 100) : 0}%</p>
-                <p>Max Combo: {maxCombo}x</p>
-              </div>
-              <button onClick={startGame}>Jugar de Nuevo</button>
-              <button className="back-button" onClick={backToMenu}>Volver al Menu</button>
-            </>
-          )}
-        </div>
+        <ResultsScreen
+          onPlayAgain={startGame}
+          onBackToMenu={backToMenu}
+          onExitMultiplayer={handleExitMultiplayer}
+        />
       )}
 
-      {(gameState === 'playing' || gameState === 'finished' || gameState === 'paused') && (
-        <div className="game-area">
-          {/* Combo grande estilo DDR */}
-          {/* Indicador de grabación */}
-          {isRecording && gameState === 'playing' && (
-            <div className="recording-indicator">
-              <span className="rec-dot">⏺</span>
-              <span className="rec-text">GRABANDO</span>
-              <span className="rec-count">{recordedNotesRef.current.length} notas</span>
-              <span className="rec-hint">ESC para terminar</span>
-            </div>
-          )}
-          {/* Combo display (solo en modo normal) */}
-          {combo > 0 && gameState === 'playing' && !isRecording && (
-            <div className="combo-display">
-              <span className="combo-number">{combo}</span>
-              <span className="combo-label">COMBO</span>
-            </div>
-          )}
-          {LANES.map((lane, laneIndex) => (
-            <div key={laneIndex} className="lane">
-              {activeNotes
-                .filter(note => note.lane === laneIndex)
-                .map(note => {
-                  const noteScreenTime = note.time - currentTime
-                  const effectiveSpeed = noteSpeed / (1 + (speedMultiplier - 1) * 0.5)
-                  const progress = 1 - (noteScreenTime / effectiveSpeed)
-                  const top = progress * 85
-
-                  return (
-                    <div
-                      key={note.id}
-                      className="note"
-                      style={{
-                        top: `${top}%`,
-                        backgroundColor: lane.color,
-                        boxShadow: `0 0 15px ${lane.color}`,
-                        opacity: note.hit ? 0 : 1,
-                      }}
-                    />
-                  )
-                })}
-
-              <div
-                className={`hit-zone ${pressedKeys[lane.key] ? 'pressed' : ''}`}
-                style={{
-                  borderColor: lane.color,
-                  backgroundColor: pressedKeys[lane.key] ? lane.color : 'transparent',
-                  boxShadow: pressedKeys[lane.key] ? `0 0 30px ${lane.color}` : 'none'
-                }}
-              >
-                <span className="key-label">{lane.key.toUpperCase()}</span>
-              </div>
-
-              {feedback[laneIndex] && Date.now() - feedback[laneIndex].time < 300 && (
-                <div className={`feedback ${feedback[laneIndex].type}`}>
-                  {feedback[laneIndex].type === 'hit' ? 'HIT!' : 'MISS'}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Game Area */}
+      <GameArea />
     </div>
+  )
+}
+
+function App() {
+  return (
+    <GameProvider>
+      <AudioProvider>
+        <MultiplayerProvider>
+          <AppContent />
+        </MultiplayerProvider>
+      </AudioProvider>
+    </GameProvider>
   )
 }
 

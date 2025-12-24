@@ -1,0 +1,17 @@
+{
+  "song": {
+    "title": "Test Song",
+    "artist": "Test"
+  },
+  "notes": [
+    {
+      "time": 1,
+      "lane": 0
+    },
+    {
+      "time": 2,
+      "lane": 1
+    }
+  ],
+  "bpm": 120
+}

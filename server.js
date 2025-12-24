@@ -133,7 +133,28 @@ app.post('/api/upload', (req, res) => {
   })
 })
 
-// Endpoint para obtener lista de canciones (combina predefinidas + uploads)
+// Funcion para extraer titulo y artista del nombre del archivo
+function parseFilename(filename) {
+  // Quitar extension .mp3
+  const name = filename.replace('.mp3', '')
+
+  // Intentar separar por " - " (formato: "Artista - Titulo")
+  const parts = name.split(' - ')
+  if (parts.length >= 2) {
+    return {
+      artist: parts[0].trim(),
+      title: parts.slice(1).join(' - ').trim()
+    }
+  }
+
+  // Si no hay separador, usar el nombre como titulo
+  return {
+    artist: 'Desconocido',
+    title: name.replace(/-/g, ' ').trim()
+  }
+}
+
+// Endpoint para obtener lista de canciones (combina predefinidas + auto-detectadas)
 app.get('/api/songs', (req, res) => {
   let allSongs = []
 
@@ -144,7 +165,6 @@ app.get('/api/songs', (req, res) => {
       const distContent = fs.readFileSync(distIndexPath, 'utf8')
       const distData = JSON.parse(distContent)
       if (Array.isArray(distData.songs)) {
-        // Agregar prefijo /songs/ a las rutas
         allSongs = distData.songs.map(s => ({
           ...s,
           audio: s.audio.startsWith('/') ? s.audio : `/songs/${s.audio}`,
@@ -156,17 +176,41 @@ app.get('/api/songs', (req, res) => {
     }
   }
 
-  // Canciones subidas por usuarios en uploads/songs
-  const uploadsIndexPath = path.join(UPLOADS_DIR, 'index.json')
-  if (fs.existsSync(uploadsIndexPath)) {
+  // Auto-detectar MP3s en uploads/songs (sin necesidad de index.json)
+  if (fs.existsSync(UPLOADS_DIR)) {
     try {
-      const uploadsContent = fs.readFileSync(uploadsIndexPath, 'utf8')
-      const uploadsData = JSON.parse(uploadsContent)
-      if (Array.isArray(uploadsData.songs)) {
-        allSongs = [...allSongs, ...uploadsData.songs]
+      const files = fs.readdirSync(UPLOADS_DIR)
+      const mp3Files = files.filter(f => f.toLowerCase().endsWith('.mp3'))
+
+      for (const mp3File of mp3Files) {
+        const songId = mp3File.replace('.mp3', '')
+        const notesFile = `${songId}.json`
+        const notesPath = path.join(UPLOADS_DIR, notesFile)
+
+        // Extraer info del nombre del archivo
+        const { title, artist } = parseFilename(mp3File)
+
+        // Verificar si hay archivo de notas y leer BPM
+        let bpm = 120
+        if (fs.existsSync(notesPath)) {
+          try {
+            const notesContent = fs.readFileSync(notesPath, 'utf8')
+            const notesData = JSON.parse(notesContent)
+            bpm = notesData.bpm || 120
+          } catch (e) {}
+        }
+
+        allSongs.push({
+          id: songId,
+          title,
+          artist,
+          audio: `/uploads/songs/${mp3File}`,
+          notes: `/uploads/songs/${notesFile}`,
+          bpm
+        })
       }
     } catch (e) {
-      console.log('Error leyendo uploads/songs/index.json')
+      console.log('Error escaneando uploads/songs:', e.message)
     }
   }
 

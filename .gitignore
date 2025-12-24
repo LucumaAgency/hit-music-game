@@ -1,6 +1,9 @@
 # Audio files
 *.mp3
 
+# User uploads (songs and notes)
+uploads/
+
 # Dev index.html (production uses dist/index.html)
 index.html
 

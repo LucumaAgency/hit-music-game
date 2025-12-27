@@ -84,14 +84,59 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   }
 }))
 
-// Endpoint de prueba
+// Funcion para extraer titulo y artista del nombre del archivo
+function parseFilename(filename) {
+  const name = filename.replace('.mp3', '')
+  const parts = name.split(' - ')
+  if (parts.length >= 2) {
+    return {
+      artist: parts[0].trim(),
+      title: parts.slice(1).join(' - ').trim()
+    }
+  }
+  return {
+    artist: 'Desconocido',
+    title: name.replace(/-/g, ' ').trim()
+  }
+}
+
+// Endpoint de prueba con debug
 app.get('/api/test', (req, res) => {
-  res.json({
+  const showDebug = req.query.debug === '1'
+
+  const response = {
     ok: true,
+    version: 3,
     message: 'Node.js funcionando',
     dirname: __dirname,
     uploadsDir: UPLOADS_DIR
-  })
+  }
+
+  if (showDebug) {
+    response.debug = {
+      timestamp: new Date().toISOString(),
+      uploadsExists: fs.existsSync(UPLOADS_DIR),
+      uploadsFiles: [],
+      mp3Files: [],
+      jsonFiles: [],
+      errors: []
+    }
+
+    try {
+      if (fs.existsSync(UPLOADS_DIR)) {
+        const files = fs.readdirSync(UPLOADS_DIR)
+        response.debug.uploadsFiles = files
+        response.debug.mp3Files = files.filter(f => f.toLowerCase().endsWith('.mp3'))
+        response.debug.jsonFiles = files.filter(f => f.toLowerCase().endsWith('.json'))
+      } else {
+        response.debug.errors.push('Carpeta uploads/songs NO existe')
+      }
+    } catch (e) {
+      response.debug.errors.push(e.message)
+    }
+  }
+
+  res.json(response)
 })
 
 // Configurar multer
@@ -492,10 +537,12 @@ app.get('/api/songs', (req, res) => {
           })
         })
       }
-    } catch (e) {}
+    } catch (e) {
+      console.log('Error leyendo dist/songs/index.json:', e.message)
+    }
   }
 
-  // Luego cargar de uploads (sobrescribe las de dist si tienen mismo ID)
+  // Luego cargar de uploads index.json (sobrescribe las de dist si tienen mismo ID)
   const uploadsIndexPath = path.join(UPLOADS_DIR, 'index.json')
   if (fs.existsSync(uploadsIndexPath)) {
     try {
@@ -503,11 +550,53 @@ app.get('/api/songs', (req, res) => {
       const uploadsData = JSON.parse(uploadsContent)
       if (Array.isArray(uploadsData.songs)) {
         uploadsData.songs.forEach(s => {
-          // Sobrescribir si existe, o agregar si es nueva
           songsMap.set(s.id, s)
         })
       }
-    } catch (e) {}
+    } catch (e) {
+      console.log('Error leyendo uploads/songs/index.json:', e.message)
+    }
+  }
+
+  // AUTO-DETECTAR MP3s en uploads/songs/ (para archivos que no están en index.json)
+  if (fs.existsSync(UPLOADS_DIR)) {
+    try {
+      const files = fs.readdirSync(UPLOADS_DIR)
+      const mp3Files = files.filter(f => f.toLowerCase().endsWith('.mp3'))
+
+      for (const mp3File of mp3Files) {
+        const songId = mp3File.replace('.mp3', '')
+
+        // Solo agregar si no existe ya en el Map
+        if (!songsMap.has(songId)) {
+          const { title, artist } = parseFilename(mp3File)
+          const notesFile = `${songId}.json`
+          const notesPath = path.join(UPLOADS_DIR, notesFile)
+
+          // Leer BPM del JSON si existe
+          let bpm = 120
+          if (fs.existsSync(notesPath)) {
+            try {
+              const notesContent = fs.readFileSync(notesPath, 'utf8')
+              const notesData = JSON.parse(notesContent)
+              bpm = notesData.bpm || 120
+            } catch (e) {}
+          }
+
+          songsMap.set(songId, {
+            id: songId,
+            title,
+            artist,
+            audio: `/uploads/songs/${mp3File}`,
+            notes: `/uploads/songs/${notesFile}`,
+            bpm,
+            source: 'auto-detected'
+          })
+        }
+      }
+    } catch (e) {
+      console.log('Error auto-detectando MP3s:', e.message)
+    }
   }
 
   // Convertir Map a array

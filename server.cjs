@@ -276,7 +276,28 @@ function analyzeAudioBuffer(channelData, sampleRate) {
     }
   }
 
-  return notesWithChords.sort((a, b) => a.time - b.time)
+  const sortedNotes = notesWithChords.sort((a, b) => a.time - b.time)
+
+  // Agregar hold notes (15% probabilidad, si hay espacio suficiente)
+  for (let i = 0; i < sortedNotes.length; i++) {
+    const note = sortedNotes[i]
+    if (note.isChord) continue // No convertir acordes en hold notes
+
+    const nextNote = sortedNotes[i + 1]
+    const maxDuration = nextNote ? nextNote.time - note.time - 0.2 : 2.0
+
+    // Solo agregar hold si hay espacio (mínimo 0.5s) y con 15% probabilidad
+    if (maxDuration >= 0.5 && seededRandom(note.time * 888 + i) > 0.85) {
+      // Duración aleatoria entre 0.5 y min(2.0, maxDuration)
+      const duration = 0.5 + seededRandom(note.time * 999 + i) * Math.min(1.5, maxDuration - 0.5)
+      sortedNotes[i] = {
+        ...note,
+        duration: Math.round(duration * 100) / 100
+      }
+    }
+  }
+
+  return sortedNotes
 }
 
 // Endpoint para subir canción (con soporte para YouTube embed)

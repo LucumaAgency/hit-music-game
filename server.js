@@ -24,14 +24,42 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 // Carpeta para uploads (fuera de dist para no ser sobrescrita por deploys)
 const UPLOADS_DIR = path.join(__dirname, 'uploads', 'songs')
 
-// Endpoint de prueba
+// Endpoint de prueba con debug incluido
 app.get('/api/test', (req, res) => {
-  res.json({
+  const showDebug = req.query.debug === '1'
+
+  const response = {
     ok: true,
     message: 'Node.js funcionando',
     dirname: __dirname,
     uploadsDir: UPLOADS_DIR
-  })
+  }
+
+  if (showDebug) {
+    // Info de debug
+    response.debug = {
+      timestamp: new Date().toISOString(),
+      uploadsExists: fs.existsSync(UPLOADS_DIR),
+      uploadsFiles: [],
+      mp3Files: [],
+      errors: []
+    }
+
+    try {
+      if (fs.existsSync(UPLOADS_DIR)) {
+        const files = fs.readdirSync(UPLOADS_DIR)
+        response.debug.uploadsFiles = files
+        response.debug.mp3Files = files.filter(f => f.toLowerCase().endsWith('.mp3'))
+        response.debug.jsonFiles = files.filter(f => f.toLowerCase().endsWith('.json'))
+      } else {
+        response.debug.errors.push('Carpeta uploads/songs NO existe')
+      }
+    } catch (e) {
+      response.debug.errors.push(e.message)
+    }
+  }
+
+  res.json(response)
 })
 
 // Endpoint de debug para diagnosticar problemas con canciones

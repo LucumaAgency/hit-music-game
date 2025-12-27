@@ -36,115 +36,137 @@ app.get('/api/test', (req, res) => {
 
 // Endpoint de debug para diagnosticar problemas con canciones
 app.get('/api/debug', (req, res) => {
-  const debug = {
-    serverInfo: {
-      dirname: __dirname,
-      cwd: process.cwd(),
-      nodeVersion: process.version,
-      platform: process.platform
-    },
-    uploadsDir: {
-      path: UPLOADS_DIR,
-      exists: fs.existsSync(UPLOADS_DIR),
-      files: [],
-      mp3Files: [],
-      jsonFiles: []
-    },
-    distSongsDir: {
-      path: path.join(__dirname, 'dist', 'songs'),
-      exists: fs.existsSync(path.join(__dirname, 'dist', 'songs')),
-      files: [],
-      indexContent: null
-    },
-    parentDirs: {
-      uploadsParent: path.join(__dirname, 'uploads'),
-      uploadsParentExists: fs.existsSync(path.join(__dirname, 'uploads')),
-      uploadsParentFiles: []
-    },
-    errors: [],
-    songsApiResult: []
-  }
-
-  // Verificar carpeta padre de uploads
-  if (debug.parentDirs.uploadsParentExists) {
-    try {
-      debug.parentDirs.uploadsParentFiles = fs.readdirSync(path.join(__dirname, 'uploads'))
-    } catch (e) {
-      debug.errors.push(`Error leyendo uploads padre: ${e.message}`)
+  try {
+    const debug = {
+      timestamp: new Date().toISOString(),
+      serverInfo: {
+        dirname: __dirname,
+        cwd: process.cwd(),
+        nodeVersion: process.version,
+        platform: process.platform,
+        env: process.env.NODE_ENV || 'not set'
+      },
+      uploadsDir: {
+        path: UPLOADS_DIR,
+        exists: false,
+        readable: false,
+        files: [],
+        mp3Files: [],
+        jsonFiles: [],
+        mp3Details: []
+      },
+      distSongsDir: {
+        path: path.join(__dirname, 'dist', 'songs'),
+        exists: false,
+        files: [],
+        indexContent: null
+      },
+      parentDirs: {
+        uploadsParent: path.join(__dirname, 'uploads'),
+        uploadsParentExists: false,
+        uploadsParentFiles: []
+      },
+      errors: [],
+      songsApiResult: []
     }
-  }
 
-  // Verificar contenido de uploads/songs
-  if (debug.uploadsDir.exists) {
+    // Verificar carpeta padre de uploads
     try {
-      const files = fs.readdirSync(UPLOADS_DIR)
-      debug.uploadsDir.files = files
-      debug.uploadsDir.mp3Files = files.filter(f => f.toLowerCase().endsWith('.mp3'))
-      debug.uploadsDir.jsonFiles = files.filter(f => f.toLowerCase().endsWith('.json'))
+      debug.parentDirs.uploadsParentExists = fs.existsSync(path.join(__dirname, 'uploads'))
+      if (debug.parentDirs.uploadsParentExists) {
+        debug.parentDirs.uploadsParentFiles = fs.readdirSync(path.join(__dirname, 'uploads'))
+      }
+    } catch (e) {
+      debug.errors.push(`Error verificando uploads padre: ${e.message}`)
+    }
 
-      // Mostrar info detallada de cada MP3
-      debug.uploadsDir.mp3Details = debug.uploadsDir.mp3Files.map(f => {
-        const stat = fs.statSync(path.join(UPLOADS_DIR, f))
-        return {
-          filename: f,
-          size: stat.size,
-          parsed: parseFilename(f)
-        }
-      })
+    // Verificar contenido de uploads/songs
+    try {
+      debug.uploadsDir.exists = fs.existsSync(UPLOADS_DIR)
+      if (debug.uploadsDir.exists) {
+        const files = fs.readdirSync(UPLOADS_DIR)
+        debug.uploadsDir.readable = true
+        debug.uploadsDir.files = files
+        debug.uploadsDir.mp3Files = files.filter(f => f.toLowerCase().endsWith('.mp3'))
+        debug.uploadsDir.jsonFiles = files.filter(f => f.toLowerCase().endsWith('.json'))
+
+        // Mostrar info detallada de cada MP3
+        debug.uploadsDir.mp3Details = debug.uploadsDir.mp3Files.map(f => {
+          try {
+            const stat = fs.statSync(path.join(UPLOADS_DIR, f))
+            return {
+              filename: f,
+              size: stat.size,
+              parsed: parseFilename(f)
+            }
+          } catch (e) {
+            return { filename: f, error: e.message }
+          }
+        })
+      }
     } catch (e) {
       debug.errors.push(`Error leyendo uploads/songs: ${e.message}`)
     }
-  } else {
-    debug.errors.push(`Carpeta uploads/songs no existe: ${UPLOADS_DIR}`)
-  }
 
-  // Verificar contenido de dist/songs
-  if (debug.distSongsDir.exists) {
+    if (!debug.uploadsDir.exists) {
+      debug.errors.push(`Carpeta uploads/songs NO existe en: ${UPLOADS_DIR}`)
+    }
+
+    // Verificar contenido de dist/songs
     try {
-      debug.distSongsDir.files = fs.readdirSync(path.join(__dirname, 'dist', 'songs'))
+      debug.distSongsDir.exists = fs.existsSync(path.join(__dirname, 'dist', 'songs'))
+      if (debug.distSongsDir.exists) {
+        debug.distSongsDir.files = fs.readdirSync(path.join(__dirname, 'dist', 'songs'))
 
-      // Leer index.json si existe
-      const distIndexPath = path.join(__dirname, 'dist', 'songs', 'index.json')
-      if (fs.existsSync(distIndexPath)) {
-        debug.distSongsDir.indexContent = JSON.parse(fs.readFileSync(distIndexPath, 'utf8'))
+        const distIndexPath = path.join(__dirname, 'dist', 'songs', 'index.json')
+        if (fs.existsSync(distIndexPath)) {
+          debug.distSongsDir.indexContent = JSON.parse(fs.readFileSync(distIndexPath, 'utf8'))
+        }
       }
     } catch (e) {
       debug.errors.push(`Error leyendo dist/songs: ${e.message}`)
     }
-  }
 
-  // Simular lo que devolvería /api/songs
-  let allSongs = []
+    // Simular lo que devolvería /api/songs
+    let allSongs = []
 
-  // Canciones de dist
-  if (debug.distSongsDir.indexContent?.songs) {
-    allSongs = debug.distSongsDir.indexContent.songs.map(s => ({
-      ...s,
-      source: 'dist',
-      audio: s.audio.startsWith('/') ? s.audio : `/songs/${s.audio}`,
-      notes: s.notes.startsWith('/') ? s.notes : `/songs/${s.notes}`
-    }))
-  }
-
-  // Auto-detectar de uploads
-  if (debug.uploadsDir.mp3Files) {
-    for (const mp3File of debug.uploadsDir.mp3Files) {
-      const songId = mp3File.replace('.mp3', '')
-      const { title, artist } = parseFilename(mp3File)
-      allSongs.push({
-        id: songId,
-        title,
-        artist,
-        audio: `/uploads/songs/${mp3File}`,
-        notes: `/uploads/songs/${songId}.json`,
-        source: 'uploads-autodetect'
-      })
+    // Canciones de dist
+    if (debug.distSongsDir.indexContent?.songs) {
+      allSongs = debug.distSongsDir.indexContent.songs.map(s => ({
+        ...s,
+        source: 'dist',
+        audio: s.audio.startsWith('/') ? s.audio : `/songs/${s.audio}`,
+        notes: s.notes.startsWith('/') ? s.notes : `/songs/${s.notes}`
+      }))
     }
+
+    // Auto-detectar de uploads
+    if (debug.uploadsDir.mp3Files && debug.uploadsDir.mp3Files.length > 0) {
+      for (const mp3File of debug.uploadsDir.mp3Files) {
+        const songId = mp3File.replace('.mp3', '')
+        const { title, artist } = parseFilename(mp3File)
+        allSongs.push({
+          id: songId,
+          title,
+          artist,
+          audio: `/uploads/songs/${mp3File}`,
+          notes: `/uploads/songs/${songId}.json`,
+          source: 'uploads-autodetect'
+        })
+      }
+    }
+
+    debug.songsApiResult = allSongs
+    debug.totalSongsFound = allSongs.length
+
+    res.json(debug)
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error en debug endpoint',
+      message: error.message,
+      stack: error.stack
+    })
   }
-
-  debug.songsApiResult = allSongs
-
-  res.json(debug)
 })
 
 // Configurar multer para subir archivos

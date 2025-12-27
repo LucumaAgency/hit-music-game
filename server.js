@@ -30,6 +30,7 @@ app.get('/api/test', (req, res) => {
 
   const response = {
     ok: true,
+    version: 2,
     message: 'Node.js funcionando',
     dirname: __dirname,
     uploadsDir: UPLOADS_DIR

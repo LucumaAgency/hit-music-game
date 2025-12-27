@@ -605,8 +605,8 @@ app.get('/api/songs', (req, res) => {
   res.json({ songs: allSongs })
 })
 
-// Fallback al frontend (Express 5 syntax)
-app.get('/{*splat}', (req, res) => {
+// Fallback al frontend
+app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'))
 })
 

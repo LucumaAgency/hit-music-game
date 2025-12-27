@@ -89,54 +89,19 @@ function parseFilename(filename) {
   const name = filename.replace('.mp3', '')
   const parts = name.split(' - ')
   if (parts.length >= 2) {
-    return {
-      artist: parts[0].trim(),
-      title: parts.slice(1).join(' - ').trim()
-    }
+    return { artist: parts[0].trim(), title: parts.slice(1).join(' - ').trim() }
   }
-  return {
-    artist: 'Desconocido',
-    title: name.replace(/-/g, ' ').trim()
-  }
+  return { artist: 'Desconocido', title: name.replace(/-/g, ' ').trim() }
 }
 
-// Endpoint de prueba con debug
+// Endpoint de prueba
 app.get('/api/test', (req, res) => {
-  const showDebug = req.query.debug === '1'
-
-  const response = {
+  res.json({
     ok: true,
-    version: 3,
     message: 'Node.js funcionando',
     dirname: __dirname,
     uploadsDir: UPLOADS_DIR
-  }
-
-  if (showDebug) {
-    response.debug = {
-      timestamp: new Date().toISOString(),
-      uploadsExists: fs.existsSync(UPLOADS_DIR),
-      uploadsFiles: [],
-      mp3Files: [],
-      jsonFiles: [],
-      errors: []
-    }
-
-    try {
-      if (fs.existsSync(UPLOADS_DIR)) {
-        const files = fs.readdirSync(UPLOADS_DIR)
-        response.debug.uploadsFiles = files
-        response.debug.mp3Files = files.filter(f => f.toLowerCase().endsWith('.mp3'))
-        response.debug.jsonFiles = files.filter(f => f.toLowerCase().endsWith('.json'))
-      } else {
-        response.debug.errors.push('Carpeta uploads/songs NO existe')
-      }
-    } catch (e) {
-      response.debug.errors.push(e.message)
-    }
-  }
-
-  res.json(response)
+  })
 })
 
 // Configurar multer
@@ -537,9 +502,7 @@ app.get('/api/songs', (req, res) => {
           })
         })
       }
-    } catch (e) {
-      console.log('Error leyendo dist/songs/index.json:', e.message)
-    }
+    } catch (e) {}
   }
 
   // Luego cargar de uploads index.json (sobrescribe las de dist si tienen mismo ID)
@@ -553,12 +516,10 @@ app.get('/api/songs', (req, res) => {
           songsMap.set(s.id, s)
         })
       }
-    } catch (e) {
-      console.log('Error leyendo uploads/songs/index.json:', e.message)
-    }
+    } catch (e) {}
   }
 
-  // AUTO-DETECTAR MP3s en uploads/songs/ (para archivos que no están en index.json)
+  // AUTO-DETECTAR MP3s en uploads/songs/
   if (fs.existsSync(UPLOADS_DIR)) {
     try {
       const files = fs.readdirSync(UPLOADS_DIR)
@@ -566,37 +527,27 @@ app.get('/api/songs', (req, res) => {
 
       for (const mp3File of mp3Files) {
         const songId = mp3File.replace('.mp3', '')
-
-        // Solo agregar si no existe ya en el Map
         if (!songsMap.has(songId)) {
           const { title, artist } = parseFilename(mp3File)
-          const notesFile = `${songId}.json`
-          const notesPath = path.join(UPLOADS_DIR, notesFile)
-
-          // Leer BPM del JSON si existe
+          const notesPath = path.join(UPLOADS_DIR, songId + '.json')
           let bpm = 120
           if (fs.existsSync(notesPath)) {
             try {
-              const notesContent = fs.readFileSync(notesPath, 'utf8')
-              const notesData = JSON.parse(notesContent)
-              bpm = notesData.bpm || 120
+              const nd = JSON.parse(fs.readFileSync(notesPath, 'utf8'))
+              bpm = nd.bpm || 120
             } catch (e) {}
           }
-
           songsMap.set(songId, {
             id: songId,
             title,
             artist,
-            audio: `/uploads/songs/${mp3File}`,
-            notes: `/uploads/songs/${notesFile}`,
-            bpm,
-            source: 'auto-detected'
+            audio: '/uploads/songs/' + mp3File,
+            notes: '/uploads/songs/' + songId + '.json',
+            bpm
           })
         }
       }
-    } catch (e) {
-      console.log('Error auto-detectando MP3s:', e.message)
-    }
+    } catch (e) {}
   }
 
   // Convertir Map a array
@@ -605,8 +556,8 @@ app.get('/api/songs', (req, res) => {
   res.json({ songs: allSongs })
 })
 
-// Fallback al frontend
-app.get('*', (req, res) => {
+// Fallback al frontend (Express 5 syntax)
+app.get('/{*splat}', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'))
 })
 

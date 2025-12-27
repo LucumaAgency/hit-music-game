@@ -13,6 +13,7 @@ function GameArea() {
     pressedKeys,
     isRecording,
     recordedNotesRef,
+    activeHolds,
   } = useGame()
 
   const {
@@ -51,6 +52,7 @@ function GameArea() {
           speedMultiplier={speedMultiplier}
           pressedKeys={pressedKeys}
           feedback={feedback}
+          activeHolds={activeHolds}
         />
       ))}
     </div>

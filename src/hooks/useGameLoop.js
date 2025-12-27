@@ -14,6 +14,9 @@ export function useGameLoop({
   selectedSong,
   ytPlayerRef,
   audioRef,
+  // Hold notes
+  processHoldTicks,
+  checkHoldExpiration,
 }) {
   const animationRef = useRef(null)
 
@@ -25,16 +28,36 @@ export function useGameLoop({
     const currentTime = getCurrentTime()
     const effectiveSpeed = noteSpeed / (1 + (speedMultiplier - 1) * 0.5)
 
-    // Find visible notes
+    // Procesar ticks de hold notes activas
+    if (processHoldTicks) {
+      processHoldTicks(currentTime)
+    }
+
+    // Verificar hold notes que terminaron por tiempo
+    if (checkHoldExpiration) {
+      checkHoldExpiration(currentTime)
+    }
+
+    // Find visible notes (incluir hold notes por su duración completa)
     const visibleNotes = notesRef.current.filter(note => {
       const noteScreenTime = note.time - currentTime
-      return noteScreenTime <= effectiveSpeed && noteScreenTime >= -0.5 && !note.hit
+      // Para hold notes, considerar el tiempo de finalización
+      const noteEndTime = note.duration ? note.time + note.duration : note.time
+      const noteEndScreenTime = noteEndTime - currentTime
+      return noteScreenTime <= effectiveSpeed && noteEndScreenTime >= -0.5 && !note.hit
     })
 
-    // Check for missed notes
+    // Check for missed notes (no marcar miss las hold notes que están siendo procesadas)
     notesRef.current.forEach(note => {
-      if (!note.hit && !note.missed && currentTime > note.time + HIT_WINDOW) {
-        registerMiss(note.lane, note.id)
+      if (!note.hit && !note.missed) {
+        // Para hold notes, el miss ocurre si no presionó al inicio
+        const missTime = note.duration
+          ? note.time + HIT_WINDOW  // Hold notes: miss si no inició a tiempo
+          : note.time + HIT_WINDOW  // Notas normales: miss después de HIT_WINDOW
+
+        if (currentTime > missTime) {
+          registerMiss(note.lane, note.id)
+        }
       }
     })
 
@@ -62,6 +85,8 @@ export function useGameLoop({
     ytPlayerRef,
     audioRef,
     notesRef,
+    processHoldTicks,
+    checkHoldExpiration,
   ])
 
   useEffect(() => {

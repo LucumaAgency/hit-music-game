@@ -105,6 +105,21 @@ function NoteEditor({ notes, song, audioRef, ytPlayerRef, onSave, onCancel }) {
     setEditedNotes(newNotes)
   }
 
+  const adjustDuration = (index, delta) => {
+    const newNotes = [...editedNotes]
+    const currentDuration = newNotes[index].duration || 0
+    const newDuration = Math.max(0, Math.round((currentDuration + delta) * 1000) / 1000)
+
+    if (newDuration === 0) {
+      // Si duración es 0, eliminar la propiedad
+      const { duration, ...noteWithoutDuration } = newNotes[index]
+      newNotes[index] = noteWithoutDuration
+    } else {
+      newNotes[index] = { ...newNotes[index], duration: newDuration }
+    }
+    setEditedNotes(newNotes)
+  }
+
   // Mover todas las notas por delta segundos
   const shiftAllNotes = (delta) => {
     const newNotes = editedNotes.map(note => ({
@@ -193,6 +208,36 @@ function NoteEditor({ notes, song, audioRef, ytPlayerRef, onSave, onCancel }) {
             {visibleNotes.map((note, idx) => {
               const relativeTime = note.time - currentTime
               const position = ((relativeTime + 0.5) / (previewWindow + 0.5)) * 100
+              const isHoldNote = note.duration && note.duration > 0
+
+              if (isHoldNote) {
+                const durationHeight = (note.duration / (previewWindow + 0.5)) * 100
+                return (
+                  <div key={idx}>
+                    {/* Barra de hold note */}
+                    <div
+                      className="preview-hold-bar"
+                      style={{
+                        left: `${(note.lane / 5) * 100 + 10}%`,
+                        top: `${position - durationHeight}%`,
+                        height: `${durationHeight}%`,
+                        backgroundColor: LANES[note.lane].color + '66',
+                        borderColor: LANES[note.lane].color,
+                      }}
+                    />
+                    {/* Cabeza de nota */}
+                    <div
+                      className="preview-note"
+                      style={{
+                        left: `${(note.lane / 5) * 100 + 10}%`,
+                        top: `${position}%`,
+                        backgroundColor: LANES[note.lane].color,
+                        boxShadow: `0 0 10px ${LANES[note.lane].color}`
+                      }}
+                    />
+                  </div>
+                )
+              }
 
               return (
                 <div
@@ -218,16 +263,18 @@ function NoteEditor({ notes, song, audioRef, ytPlayerRef, onSave, onCancel }) {
                 <th>#</th>
                 <th>Tiempo</th>
                 <th>Carril</th>
+                <th>Duración</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {editedNotes.map((note, index) => {
                 const isNear = Math.abs(note.time - currentTime) < 0.3
+                const isHoldNote = note.duration && note.duration > 0
                 return (
                   <tr
                     key={index}
-                    className={`note-row ${isNear ? 'note-current' : ''}`}
+                    className={`note-row ${isNear ? 'note-current' : ''} ${isHoldNote ? 'hold-note-row' : ''}`}
                   >
                     <td>{index + 1}</td>
                     <td className="note-time-cell">
@@ -253,6 +300,19 @@ function NoteEditor({ notes, song, audioRef, ytPlayerRef, onSave, onCancel }) {
                       >
                         {LANES[note.lane].key.toUpperCase()}
                       </span>
+                    </td>
+                    <td className="note-duration-cell">
+                      <button
+                        className="time-btn"
+                        onClick={() => adjustDuration(index, -0.1)}
+                      >-</button>
+                      <span className="note-duration">
+                        {isHoldNote ? `${note.duration.toFixed(1)}s` : '-'}
+                      </span>
+                      <button
+                        className="time-btn"
+                        onClick={() => adjustDuration(index, 0.1)}
+                      >+</button>
                     </td>
                     <td>
                       <button

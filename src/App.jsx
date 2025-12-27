@@ -40,6 +40,9 @@ function AppContent() {
     setNotesData, setLoadedFromJson,
     resetGame, registerMiss, findHitNote, registerHit, recordNote,
     setPressedKeys,
+    // Hold notes
+    startHold, endHold, processHoldTicks, checkHoldExpiration,
+    recordNoteStart, recordNoteEnd,
   } = game
 
   const {
@@ -84,6 +87,9 @@ function AppContent() {
     selectedSong,
     ytPlayerRef,
     audioRef,
+    // Hold notes
+    processHoldTicks,
+    checkHoldExpiration,
   })
 
   // Toggle pause
@@ -126,6 +132,12 @@ function AppContent() {
     combo,
     hits,
     misses,
+    // Hold notes
+    startHold,
+    endHold,
+    // Recording with hold notes
+    recordNoteStart,
+    recordNoteEnd,
   })
 
   // Guest auto-load song

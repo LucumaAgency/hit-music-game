@@ -18,6 +18,12 @@ export function useKeyboardInput({
   combo,
   hits,
   misses,
+  // Hold notes
+  startHold,
+  endHold,
+  // Recording with hold notes
+  recordNoteStart,
+  recordNoteEnd,
 }) {
   const handleKeyDown = useCallback((e) => {
     const key = e.key.toLowerCase()
@@ -42,9 +48,13 @@ export function useKeyboardInput({
 
     const currentTime = getCurrentTime()
 
-    // Recording mode
+    // Recording mode - usa keydown para iniciar
     if (isRecording) {
-      recordNote(currentTime, laneIndex)
+      if (recordNoteStart) {
+        recordNoteStart(currentTime, laneIndex)
+      } else {
+        recordNote(currentTime, laneIndex)
+      }
       return
     }
 
@@ -52,12 +62,17 @@ export function useKeyboardInput({
     const hitNote = findHitNote(laneIndex, currentTime)
 
     if (hitNote) {
-      registerHit(laneIndex, hitNote.id)
+      // Verificar si es hold note
+      if (hitNote.duration && hitNote.duration > 0 && startHold) {
+        // Iniciar hold note
+        startHold(hitNote.id, currentTime)
+      } else {
+        // Nota normal
+        registerHit(laneIndex, hitNote.id)
+      }
 
       // Send multiplayer update
       if (sendScoreUpdate && isMultiplayer) {
-        // We need to get updated values after registerHit
-        // This is a simplification - in reality we'd need the new values
         sendScoreUpdate(score + 100, combo + 1, hits + 1, misses)
       }
     }
@@ -78,12 +93,39 @@ export function useKeyboardInput({
     combo,
     hits,
     misses,
+    startHold,
+    recordNoteStart,
   ])
 
   const handleKeyUp = useCallback((e) => {
     const key = e.key.toLowerCase()
+    const laneIndex = LANES.findIndex(l => l.key === key)
+
     setPressedKeys(prev => ({ ...prev, [key]: false }))
-  }, [setPressedKeys])
+
+    if (gameState !== 'playing' || isPaused) return
+
+    const currentTime = getCurrentTime()
+
+    // Recording mode - usa keyup para terminar
+    if (isRecording && recordNoteEnd && laneIndex !== -1) {
+      recordNoteEnd(currentTime, laneIndex)
+      return
+    }
+
+    // Normal mode - terminar hold note si hay una activa
+    if (endHold && laneIndex !== -1) {
+      endHold(laneIndex, currentTime)
+    }
+  }, [
+    setPressedKeys,
+    gameState,
+    isPaused,
+    getCurrentTime,
+    isRecording,
+    recordNoteEnd,
+    endHold,
+  ])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)

@@ -1809,8 +1809,15 @@ body {
     bottom: 15%;
   }
 
+  /* Hide key labels in hit zones on mobile (touch buttons show them instead) */
   .key-label {
-    font-size: 1rem;
+    display: none;
+  }
+
+  /* Make hit zones smaller on mobile */
+  .hit-zone {
+    height: 20px;
+    border-width: 2px;
   }
 
   /* Combo display smaller on mobile */

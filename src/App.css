@@ -9,11 +9,20 @@ body {
   color: white;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   overflow: hidden;
+  /* Prevent pull-to-refresh and overscroll on mobile */
+  overscroll-behavior: none;
 }
 
 .app {
   width: 100vw;
   height: 100vh;
+  /* Prevent text selection and touch callouts on mobile */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
   display: flex;
   flex-direction: column;
 }
@@ -1680,4 +1689,290 @@ body {
   justify-content: space-between;
   font-size: 0.8rem;
   color: #666;
+}
+
+/* ========================================
+   MOBILE TOUCH CONTROLS
+   ======================================== */
+
+.touch-controls {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 130px;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.95) 40%);
+  padding: 15px 10px 25px;
+  z-index: 150;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 10px;
+  touch-action: manipulation;
+}
+
+.touch-button {
+  flex: 1;
+  max-width: 65px;
+  height: 85px;
+  border: 3px solid;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  cursor: pointer;
+  transition: none;
+}
+
+.touch-button.pressed {
+  transform: scale(0.92);
+  box-shadow: 0 0 30px var(--lane-color), inset 0 0 20px rgba(255,255,255,0.3);
+}
+
+.touch-button-label {
+  font-size: 1.6rem;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+/* ========================================
+   MOBILE RESPONSIVE STYLES
+   ======================================== */
+
+@media (max-width: 768px), (pointer: coarse) {
+  /* Show touch controls on mobile/touch devices */
+  .touch-controls {
+    display: flex;
+  }
+
+  /* Hide keyboard hints on mobile */
+  .keys-hint {
+    display: none;
+  }
+
+  /* Adjust header for mobile */
+  .header {
+    padding: 10px 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .header h1 {
+    font-size: 1.2rem;
+  }
+
+  .stats {
+    gap: 10px;
+    font-size: 0.9rem;
+  }
+
+  .stats span {
+    padding: 3px 8px;
+  }
+
+  .controls {
+    gap: 10px;
+  }
+
+  .volume-control, .speed-control {
+    font-size: 0.8rem;
+  }
+
+  .volume-control input[type="range"] {
+    width: 60px;
+  }
+
+  /* Adjust game area for mobile portrait */
+  .game-area {
+    padding: 10px 5px;
+    padding-bottom: 140px; /* Space for touch controls */
+    gap: 5px;
+  }
+
+  .lane {
+    width: 60px;
+  }
+
+  .note {
+    width: 55px;
+    height: 20px;
+  }
+
+  .hit-zone {
+    width: 55px;
+    height: 30px;
+    bottom: 15%;
+  }
+
+  .key-label {
+    font-size: 1rem;
+  }
+
+  /* Combo display smaller on mobile */
+  .combo-display {
+    top: 20%;
+  }
+
+  .combo-number {
+    font-size: 4rem;
+  }
+
+  .combo-label {
+    font-size: 1.2rem;
+  }
+
+  /* Hit line adjustment */
+  .game-area::before {
+    width: 340px;
+    bottom: calc(15% + 15px);
+  }
+
+  /* Hold notes on mobile */
+  .hold-note-bar {
+    width: 40px;
+  }
+
+  /* Menu adjustments for mobile */
+  .menu {
+    padding: 30px 20px;
+    width: 95%;
+    max-height: 90vh;
+  }
+
+  .menu.menu-wide {
+    padding: 20px 15px;
+  }
+
+  .menu-layout {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .menu-column:first-child {
+    min-width: unset;
+    max-width: unset;
+  }
+
+  .menu h2 {
+    font-size: 1.4rem;
+  }
+
+  .menu button {
+    padding: 12px 30px;
+    font-size: 1.1rem;
+  }
+
+  /* Home screen mobile */
+  .home-container {
+    padding: 20px 10px;
+  }
+
+  .home-header h1 {
+    font-size: 2rem;
+  }
+
+  .home-header p {
+    font-size: 1rem;
+  }
+
+  .actions-row {
+    gap: 15px;
+  }
+
+  .action-card {
+    min-width: unset;
+    padding: 20px;
+  }
+
+  .songs-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Note editor mobile */
+  .note-editor {
+    padding: 10px;
+  }
+
+  .editor-controls {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .global-offset {
+    margin-left: 0;
+    padding-left: 0;
+    border-left: none;
+    width: 100%;
+    justify-content: center;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #444;
+  }
+
+  .editor-main {
+    flex-direction: column;
+  }
+
+  .lane-preview {
+    width: 100%;
+    min-width: unset;
+    max-height: 200px;
+  }
+
+  /* Recording indicator on mobile */
+  .recording-indicator {
+    top: 10%;
+  }
+
+  .rec-text {
+    font-size: 1.2rem;
+  }
+
+  .rec-count {
+    font-size: 2rem;
+  }
+
+  /* Hide YouTube player on mobile */
+  .youtube-player-container {
+    display: none !important;
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 400px) {
+  .touch-button {
+    max-width: 60px;
+    height: 70px;
+  }
+
+  .touch-button-label {
+    font-size: 1.3rem;
+  }
+
+  .lane {
+    width: 50px;
+  }
+
+  .note {
+    width: 45px;
+    height: 18px;
+  }
+
+  .hit-zone {
+    width: 45px;
+    height: 25px;
+  }
+
+  .game-area::before {
+    width: 280px;
+  }
+
+  .hold-note-bar {
+    width: 35px;
+  }
 }

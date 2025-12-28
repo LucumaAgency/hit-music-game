@@ -20,6 +20,7 @@ import RecordingDoneScreen from './components/screens/RecordingDoneScreen'
 import MultiplayerMenu from './components/multiplayer/MultiplayerMenu'
 import MultiplayerLobby from './components/multiplayer/MultiplayerLobby'
 import GameArea from './components/game/GameArea'
+import TouchControls from './components/game/TouchControls'
 import NoteEditor from './components/NoteEditor'
 
 import { downloadJSON } from './utils/helpers'
@@ -363,6 +364,28 @@ function AppContent() {
 
       {/* Game Area */}
       <GameArea />
+
+      {/* Touch Controls (mobile) */}
+      <TouchControls
+        gameState={gameState}
+        isPaused={isPaused}
+        isRecording={isRecording}
+        getCurrentTime={getCurrentTime}
+        findHitNote={findHitNote}
+        registerHit={registerHit}
+        recordNote={recordNote}
+        setPressedKeys={setPressedKeys}
+        startHold={startHold}
+        endHold={endHold}
+        recordNoteStart={recordNoteStart}
+        recordNoteEnd={recordNoteEnd}
+        sendScoreUpdate={sendScoreUpdate}
+        isMultiplayer={isMultiplayer}
+        score={score}
+        combo={combo}
+        hits={hits}
+        misses={misses}
+      />
     </div>
   )
 }
